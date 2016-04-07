@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="description" content="DispatchBuddy Interface">
+    <meta name="author" content="David Ford">
+    <title>DispatchBuddy</title>
+    <link rel="stylesheet" href="/css/db.css"/>
+  </head>
+
+  <body>
+    <div class="three-row">
+      <header>
+        <div id="headbar">
+          <div class="flex-item">
+            <h1>DispatchBuddy</h1>
+            <h2>Extensible, Metrics, Tools</h2>
+            <h3>DispatchBuddy v4.0</h3>
+          </div>
+
+          <div><!-- put this stuff floated to the right -->
+            <div id="loginbar">
+              <div>
+                <label for="username">Username</label>
+                <input type="text" name="username"/>
+              </div>
+              <div>
+                <label for="password">Password</label>
+                <input type="password" name="password"/>
+              </div>
+            </div>
+
+            <time datetime="2015-08-06">DB code date: 2015, August 6th</time>
+          </div>
+        </div>
+      </header>
+
+      <div class="two-column">
+        <nav>
+        <ul>
+          <li>Overview</li>
+          <li>History</li>
+          <li>District</li>
+          <!-- these are private tabs -->
+          <li>Send message</li>
+          <li>Callbook</li>
+          <li>Templates</li>
+          <li>Hazmat layer</li>
+          <li>Hydrant layer</li>
+        </ul>
+        </nav>
+
+        <main id="content" class="body">
+          <p>public info</p>
+          <ul>
+          <li>show current stats in a few lines, in a small rectangle</li>
+          <li>box of recent dispatches, make sure any active dispatches are
+          highlighted as ongoing
+            <ul>
+              <li>public info, link for google map that shows icons for recent</li>
+            </ul>
+          </li>
+          <li>show google map of district with borders</li>
+          <li>map layer for hydrants</li>
+          <li>map layer for fire stations</li>
+          <li>unit locations</li>
+          <li>pertinent weather</li>
+          </ul>
+          
+          <p>requires login:</p>
+          <ul>
+            <li>overlay indicating data on these pages is confidential or
+            sensitive</li>
+            <li>search box for events</li>
+            <li>icons on google map are clickable to drill into event detail</li>
+            <li>map layer for significant hazmats</li>
+            <li>all calls are now hyperlinked to a detailed report</li>
+            <li>detailed report includes:
+              <ul>
+                <li>hazard information about this location and nearby,
+                inc:hazmat id# ref, emerg. info for hazmat id#</li>
+                <li>statistical data for this location</li>
+                <li>historical dispatches for this location</li>
+                <li>do we have a caller #? make caller # linkable to any other
+                dispatches this caller has reported -- filter overwhelmingly
+                common caller numbers..</li>
+                <li>floorplan? floorplan editor?</li>
+                <li>contact and other emergency data</li>
+              </ul>
+            </li>
+            <li>DB recipient mgt</li>
+            
+            <li>gateway/format template editor</li>
+            <li>hazmat layer editor</li>
+            <li>hydrant layer editor</li>
+            
+            <li>manual message dispatching</li>
+          </ul>
+          
+        </main>
+      
+      </div>
+      <footer>
+        <p>Copyright © 2015 David Ford SMVFD</p>
+      </footer>
+    </div>
+  </body>
+
+</html>
