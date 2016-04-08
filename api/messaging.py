@@ -16,8 +16,9 @@ class Messaging(api.gateways.Gateway):
         self.logger    = logging.getLogger()
     
 
-    def set_db(self, db):
+    def set_config(self, db, config):
         self.db = db
+        self.config = config
 
 
     def _run(self, gateway, mediatype, id, evdict):

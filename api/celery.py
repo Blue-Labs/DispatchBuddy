@@ -1,5 +1,6 @@
 import base64, logging, sys, time, hashlib, datetime, traceback
 import psycopg2, os
+import configparser
 
 from celery import Celery, Task, group, chord
 from celery.result import GroupResult
@@ -31,6 +32,7 @@ capp.conf.update(
 )
 
 DB=None
+config=None
 
 # DB should be hooked under celery init. this is to signal the database instances to exit
 # it's damned convoluted. celery forks workers on startup and will create a DB context then.
@@ -38,12 +40,21 @@ DB=None
 @worker_init.connect()
 def start_db(**kwargs):
     global DB
+    logger = logging.getLogger()
+    logger.info('init connect start/DB')
     DB = Database()
 
 @worker_process_init.connect()
 def start_db(**kwargs):
-    global DB
-    DB = Database()
+    global DB, config
+    logger = logging.getLogger()
+    logger.info('process_init connect start/DB, kwargs: {}'.format(kwargs))
+    configfile   = '/etc/dispatchbuddy/DispatchBuddy.conf'
+    config       = configparser.ConfigParser()
+    if not config.read(configfile):
+        logger.warning ('Error reading required configuration file: {}'.format(configfile))
+
+    DB = Database(config)
 
 
 # shutdown the MainProcess DB (note; you won't see logging information from DB here.)
@@ -168,7 +179,7 @@ class Maleman(Messaging, Task):
         Messaging.__init__(self)
     
     def run(self, gateway, mediatype, id, evdict, *args, **kwargs):
-        self.set_db(DB)
+        self.set_config(DB, config)
         self._run(gateway, mediatype, id, evdict)
 
 
