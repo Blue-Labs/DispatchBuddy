@@ -139,7 +139,7 @@ class EventManager:
                         self.logger.debug('{} is in state {}'.format(event.uuid, event.queueid.state))
                     if event.queueid and event.queueid.ready():
                         if not event.stall_forced:
-                            self.logger.debug('{} is done, can be blown out your ass'.format(event.uuid))
+                            self.logger.debug('{} is done, can be purged from queue'.format(event.uuid))
                             dels.append(evid)
                         else:
                             if event.stall_death > now:
