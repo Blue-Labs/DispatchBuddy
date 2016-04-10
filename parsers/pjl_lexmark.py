@@ -277,6 +277,9 @@ class PCLParser():
                 self.fonts[self.current_font_id] = None
             if not self.current_font_id in self.glyph_data_blocks:
                 self.glyph_data_blocks[self.current_font_id] = {}
+        
+        elif cmd == b'(X':
+            self.current_font_id = int(value)
 
         # *cE downloads a character from the host into the printer
         elif cmd == b'*cE':
