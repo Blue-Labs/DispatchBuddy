@@ -1,22 +1,134 @@
+#!/usr/bin/python
 
-import logging, threading, random, time
-import psycopg2, psycopg2.extras, psycopg2.extensions
+import configparser
+import datetime
+import functools
+import logging
+import psycopg2
+import psycopg2.extensions
+import psycopg2.extras
+import queue
+import threading
+import time
+import random
 
-class Database():
+from celery.utils.log import get_task_logger
+logger = get_task_logger(__name__)
+
+class Database:
     def __init__(self, config):
-        self.logger         = logging.getLogger()
-        self.online         = None
-        self._shutdown      = threading.Event()
-        self.reconnect      = threading.Event()
-        self.conn           = None
-        self.recipient_list = None
-        self.reload_trigger = False
-        self.config         = config
-        
-        cm = threading.Thread(target=self._connection_monitor, name='Database')
-        cm.start()
+        self.logger               = logger
+
+        self.config               = config
+        self._shutdown_queue      = threading.Event()
+        self._shutdown_exit_wait  = threading.Event()
+        self._shutdown_connection = threading.Event()
+        self.reconnect            = threading.Event()
+        self.tid                  = threading.get_ident()
+        self.curth                = threading.currentThread()
+        self.child_tids           = {}
+
+        self.pending              = threading.Event()
+        self.pending_xact         = queue.Queue()
+
+        self.conn                 = None
+        self.network              = threading.Event()
+
+        t = threading.Thread(target=self._connection_monitor, name='Database Connection Monitor')
+        t.start()
+        self.logger.info('start: {}'.format(t.name))
+        self.child_tids[t.ident]=t.name
+
+        t = threading.Thread(target=self._push_queue, name='Database Queue Handler')
+        t.start()
+        self.logger.info('start: {}'.format(t.name))
+        self.child_tids[t.ident]=t.name
+
+        self.network.clear() # setup roadblock
+        self.reconnect.set()
 
 
+    """ public methods """
+    def store_event(self, ev):
+        keys     = sorted(ev.keys())
+        t_fields = ','.join(keys)
+        t_values = ','.join(['%%(%s)s' % x for x in keys])
+        qstr     = 'INSERT INTO incidents ({}) VALUES ({})'.format(t_fields, t_values)
+        self.logger.debug(qstr)
+        self._do_statement(qstr, ev, commit=True)
+
+    def add_event_hash(self, hash, ts):
+        self._do_statement('INSERT INTO event_hashes (hash,ts) VALUES (%s,%s)', (hash,ts))
+        self.event_hashes.append((hash,ts))
+
+    def expire_event_hashes(self):
+        self._do_statement("DELETE FROM event_hashes WHERE ts < now() - interval '5 minutes'")
+        self._reload_event_hashes()
+
+    def store_transmitted_message_status(self, **kwargs):
+        event_uuid      = kwargs.get('event_uuid')
+        if not event_uuid:
+            raise KeyError('event_uuid is required')
+
+        recipient       = kwargs.get('recipient')
+        if not recipient:
+            raise KeyError('recipient is required')
+
+        gateway         = kwargs.get('gateway')
+        if not gateway:
+            raise KeyError('gateway is required')
+
+        mediatype       = kwargs.get('mediatype')
+        if not mediatype:
+            raise KeyError('mediatype is required')
+
+        delivery_id     = kwargs.get('delivery_id')
+        delivery_ts     = kwargs.get('delivery_ts')
+        if not delivery_ts:
+            delivery_ts = datetime.datetime.utcnow()
+
+        delivery_status = kwargs.get('status', '')
+        completed       = kwargs.get('completed', False)
+        reason          = kwargs.get('reason', '')
+
+        r = self._do_statement('''
+          INSERT INTO event_deliveries (
+              event_uuid,recipient,gateway,mediatype,delivery_id,delivery_ts,delivery_status,completed,reason
+              )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+          ''', (event_uuid, recipient, gateway, mediatype, delivery_id, delivery_ts, delivery_status, completed, reason))
+
+    def shutdown(self):
+        self.logger.info('shutting down')
+
+        # when running from commandline to test, we must allow enough time
+        # for the startup process to finish
+        if not self.pending_xact.empty():
+            self.network.wait()
+            self.logger.info('queue is draining')
+
+            retries = 10
+            while retries and not self.pending_xact.empty():
+                self.logger.info('queue is still draining')
+                time.sleep(3)
+                retries -= 1
+
+        if not self.pending_xact.empty():
+            self.logger.warning("Queue is not empty, losing records")
+
+        self._shutdown_queue.set()
+        self._shutdown_exit_wait.clear()
+        self.pending.set()
+        # tell the GIL we wish to yield our thread so another gets scheduled
+        # then wait until the queue empties
+        time.sleep(0)
+        self._shutdown_exit_wait.wait()
+        self._shutdown_connection.set()
+        self.reconnect.set()
+        self._disconnect()
+
+
+    """ private methods """
     def _setup_notifications(self):
         _notify_dispatchbuddy_proc = '''
             CREATE OR REPLACE FUNCTION notify_dispatchbuddy_proc() RETURNS trigger AS $$
@@ -65,141 +177,204 @@ class Database():
             '''
 
         with self.conn.cursor() as c:
-            c.execute(_notify_dispatchbuddy_proc)
-            
+            while True:
+                try:
+                    c.execute(_notify_dispatchbuddy_proc)
+                    break
+                except Exception as e:
+                    # this is messy, needs to be done right
+                    self.logger.warning('{}'.format(e))
+                    time.sleep(random.random()*5)
+
             for table in {'msgingprefs2015',}:
                 for op,when in {'insert':'BEFORE',
                                 'update':'AFTER',
                                 'delete':'BEFORE'}.items():
                     c.execute(_trig.format(op=op, when=when, table=table))
-        
+
+    def _reload_recipients(self):
+        self.recipient_list = self._do_statement('SELECT * FROM msgingprefs2015',
+            required=True, results=True)
+        self.logger.info('RX list is {} entries'.format(len(self.recipient_list)))
+
+    def _reload_event_hashes(self):
+        self.event_hashes = self._do_statement('SELECT * from event_hashes',
+            required=True, results=True)
 
     def _connection_monitor(self):
-        self.reconnect.set()
-        
+        self.recipient_list = None
+        self.event_hashes   = []
+
         while True:
-            self.reconnect.wait(10)
+            if not self.conn:
+                hangtime=2
+            else:
+                hangtime=20
 
-            if self._shutdown.is_set():
-              self._disconnect()
-              break
+            self.reconnect.wait(hangtime)
 
-            #self.logger.debug('DB connection check')
+            if self._shutdown_connection.is_set():
+                self.logger.info('stop: {}'.format(self.child_tids[threading.get_ident()]))
+                break
 
-            # test to see if we're online by sending an SQL "ping"
+            # test to see if we're online by reading the isolation level
             try:
-              with self.conn.cursor() as c:
-                c.execute('SELECT 1=1')
-                c.fetchone()
-            except:
-              self.online = False
-            
-            if not self.online:
-              self.logger.info('reconnecting to DB')
-              self._connect()
-              if self.online:
-                self.logger.info('connected to DB, fetching data')
-                self.reconnect.clear()
-                self.reload_recipients()
-                self.reload_event_hashes()
-                # don't do this in parallel or we get DB errors about concurrent updates
-                while True:
-                    time.sleep(random.random()*5)
-                    try:
-                        self._setup_notifications()
-                        break
-                    except:
-                        pass
-                with self.conn.cursor() as c:
-                    c.execute('LISTEN dispatchbuddy')
-            
-            if self.online:
+                self.conn
+                self.conn.isolation_level
+            except Exception as e:
+                if not self.conn is None:
+                    self.logger.warning('marking offline: {}'.format(e))
+                self.network.clear()
+
+            if not self.network.is_set():
+                self.logger.info('reconnecting')
+                self._connect()
+
+                if self.network.is_set():
+                    self.logger.info('connected, fetching data')
+                    self.reconnect.clear()
+                    self._reload_recipients()
+                    self._reload_event_hashes()
+                    self._setup_notifications()
+
+                    with self.conn.cursor() as c:
+                        c.execute('LISTEN dispatchbuddy')
+                    self.logger.info('finished reconnect')
+
+            if self.network.is_set():
+                reload_trigger = False
                 with self.conn.cursor() as c:
                     while self.conn.notifies:
                         notify = self.conn.notifies.pop(0)
                         self.logger.debug('Got NOTIFY: {}'.format(notify.payload))
-                        self.reload_trigger = True
-                if self.reload_trigger:
-                    self.reload_trigger = False
-                    self.reload_recipients()
-                    self.reload_event_hashes()
+                        reload_trigger = True
+                if reload_trigger:
+                    self._reload_recipients()
+                    self._reload_event_hashes()
+
+            else:
+                self.logger.error('WTRF. not online?')
+                time.sleep(1) # wait at least 1 second before reconnect
+
+        self.logger.info('exit: {}'.format(self.child_tids[threading.get_ident()]))
 
 
     def _connect(self):
-        if self.online:
-            self.online = None
-            try:
-              self.conn.close()
-            except:
-              pass
-        
+        self.network.clear()
+        if self.conn:
+            self.conn.close()
+
         dburi = self.config.get('Database', 'db uri')
 
-        self.conn = psycopg2.connect(dburi)
+        try:
+            self.conn = psycopg2.connect(dburi)
+        except Exception as e: # all errors will be fatal
+            self.logger.critical('failed connect: {}'.format(e))
+
         if self.conn:
-            self.online = True
+            self.network.set()
             self.conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+            self.pending.set()
 
 
     def _disconnect(self):
         self.conn.close()
-        self.online = None
         self.conn = None
 
 
-    def shutdown(self):
-        self.logger.info('shutting down DB')
-        self._shutdown.set()
-        self.reconnect.set()
+    def _do_statement(self, statement, args=None, required=False, results=False, commit=False):
+        # if required, do statement immediately, otherwise just
+        # put it on the queue and return promptly
+        rv = None
 
-
-    def reload_recipients(self):
-        with self.conn.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor) as c:
-            c.execute('SELECT * from msgingprefs2015')
-            self.recipient_list = c.fetchall()
-            self.logger.debug('RX is {} entries'.format(len(self.recipient_list)))
-
-    def reload_event_hashes(self):
-        with self.conn.cursor() as c:
-            c.execute('SELECT * from event_hashes')
-            self.event_hashes = c.fetchall()
-    
-    def store_event(self, ev):
-        with self.conn.cursor() as c:
-            keys     = sorted(ev.keys())
-            t_fields = ','.join(keys)
-            t_values = ','.join(['%%(%s)s' % x for x in keys])
-            qstr     = 'INSERT INTO incidents ({}) VALUES ({})'.format(t_fields, t_values)
-            print(qstr)
-            
+        while required:
             try:
-                c.execute(qstr, ev)
-                self.conn.commit()
-            except:
-                self.conn.rollback()
-                raise
+                with self.conn.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor) as c:
+                    c.execute(statement, args)
 
+                    if commit:
+                        self.conn.commit()
 
-    def add_event_hash(self, hash, ts):
-        with self.conn.cursor() as c:
-            try:
-                c.execute('INSERT INTO event_hashes (hash,ts) VALUES (%s,%s)', (hash,ts))
-                self.conn.commit()
-                self.event_hashes.append((hash,ts))
+                    if results:
+                        return c.fetchall()
+
+                    return
+
             except Exception as e:
-                self.conn.rollback()
-                raise
+                self.logger.warning('{}'.format(e))
+                self.network.wait()
+
+        self.pending_xact.put((statement, args, required, results, commit))
+        self.pending.set()
 
 
-    def expire_event_hashes(self):
-        if not self.conn:
-            self.logger.warning('DB instance is not online')
-            self.online = None
-            self.reconnect.set()
-            return
-        
-        with self.conn.cursor() as c:
-            c.execute("DELETE FROM event_hashes WHERE ts < now() - interval '5 minutes'")
-            if c.rowcount:
-                self.conn.commit()
-                self.reload_event_hashes()
+    def _push_queue(self):
+        logger = logging.getLogger()
+        while True:
+            self.pending.wait()
+            self.pending.clear()
+
+            if self._shutdown_queue.is_set() and self.pending_xact.empty():
+                self.logger.info('stop: {}'.format(self.child_tids[threading.get_ident()]))
+                self.pending.set()
+                break
+
+            if self.pending_xact.empty():
+                continue
+
+            # check for online status, reading isolation_level will ping the server
+            try:
+                self.conn
+                self.conn.isolation_level
+
+            except (psycopg2.OperationalError, psycopg2.InterfaceError):
+                self.reconnect.set()
+                continue
+
+            except AttributeError: # we're not connected yet
+                logger.debug('waiting for connection')
+                continue
+
+            except Exception as e:
+                logger.critical('1.{}, {}'.format(e, e.__class__.__name__))
+                continue
+
+
+            # try the statement
+            with self.conn.cursor() as c:
+                success = False
+                try:
+                    v =self.pending_xact.get()
+                    statement, args, required, results, commit = v
+                    c.execute(statement, args)
+
+                    if c.rowcount:
+                        self.conn.commit()
+                    success = True
+
+                except (psycopg2.OperationalError, psycopg2.InterfaceError):
+                    logger.warning('reconnect needed, this should NOT have occurred')
+                    self.reconnect.set()
+
+                except Exception as e:
+                    logger.warning('op failed: {}, {}'.format(e, e.__class__.__name__))
+                    self.conn.rollback()
+                    self.pending_xact.put((statement, args, required, results, commit))
+                    self.pending.set()
+                    time.sleep(1)
+
+                finally:
+                    if not success:
+                        self.pending_xact.put((statement, args, required, results, commit))
+                        self.pending.set()
+
+            if self._shutdown_queue.is_set() and self.pending_xact.empty():
+                self.pending.set()
+                break
+
+            # queue not empty?
+            if not self.pending_xact.empty():
+                self.pending.set()
+
+        self._shutdown_exit_wait.set()
+        self.logger.info('exit: {}'.format(self.child_tids[threading.get_ident()]))
