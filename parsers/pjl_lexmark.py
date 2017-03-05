@@ -1,13 +1,33 @@
 
 '''
 This Parser designed to interpret the PCL emulation engine for the Lexmark E120 printer
+
+https://publications.lexmark.com/publications/pdfs/techref_WB.pdf
+http://www.kudesnik.net/bin/PCL5E.PDF (a little detailed with font download information)
+http://www.undocprint.org/_media/formats/page_description_languages/hl-series_techreference_revc_oct1994.pdf (describes soft font download in high detail; pg.64)
+
+tangent note: https://opensource.apple.com/source/cups/cups-136/cups/filter/rastertolabel.c for pcl compression
+
 '''
 
 import os, io, re, time, sys
 import struct
+import string
 import logging
+import traceback
+
 from dateutil import parser
 from collections import namedtuple, OrderedDict
+
+from fontTools.agl import UV2AGL
+from fontTools.ttLib import TTFont
+
+glyphset                 = TTFont('/usr/share/fonts/TTF/arialbd.ttf').getGlyphSet()
+ascii_to_agl             = {c:UV2AGL[ord(c)] for c in string.printable[:-6]}
+glyf_coordinate_to_ascii = {
+                            0: {glyphset[ascii_to_agl[c]]._glyph.compileCoordinates():c  # default font
+                                for c in string.printable[:-6]},
+                           }
 
 
 # PJL implementation of PCL
@@ -86,8 +106,25 @@ class PCLParser():
     # next rectangle. this means nothing can be hardcoded. we MUST match based on the font data. at
     # present, i have no other way to glean which character is being printed. unfortunately this is
     # horribly inefficient
+    #
+    #  update: most of the time i can guess the correct symbol and use a global offset
+    #          but this is rather fragile
+    _c = namedtuple('Glyph', ['x_max','pc',])
     glyph_data_blocks = {
-      0: {}
+      0: {},
+     -1: { 37:_c(x_max=428, pc=':'),
+           38:_c(x_max=428, pc=' '),
+           30:_c(x_max=428, pc='X1'),
+           31:_c(x_max=428, pc='X2'),
+           32:_c(x_max=428, pc='A'),
+           33:_c(x_max=428, pc='\\d'),
+           39:_c(x_max=428, pc='C'),
+           40:_c(x_max=428, pc='o'),
+           43:_c(x_max=428, pc='\\u'),
+           58:_c(x_max=428, pc='\\d'),
+           59:_c(x_max=428, pc='\\>'),
+           88:_c(x_max=428, pc='\\?'),
+         },                                        # educated guess
     }
     
     # common defined escape sequences
@@ -294,13 +331,17 @@ class PCLParser():
             _continuation = self.read_block(1) == b'\x01'
             _descriptor_size = ord(self.read_block(1))
             _class = ord(self.read_block(1))
-            _descriptor_additional = self.read_block(_descriptor_size-2)
+            
+            if _descriptor_size == 2:
+                _descriptor_additional = ''
+            else:
+                _descriptor_additional = self.read_block(_descriptor_size-2)
 
             _data_size = struct.unpack('>H', self.read_block(2))[0]
             _glyph_id = struct.unpack('>H', self.read_block(2))[0]
 
             rd_size = _data_size-4
-            self.logger.debug('read {} bytes of glyph data'.format(rd_size))
+            self.logger.debug('read 10+{} bytes of glyph data, continuation:{}'.format(rd_size, _continuation))
 
             if rd_size > 0:
                 # read glyph data table
@@ -309,9 +350,9 @@ class PCLParser():
                 _gd_y_min = struct.unpack('>h', self.read_block(2))[0]
                 _gd_x_max = struct.unpack('>h', self.read_block(2))[0]
                 _gd_y_max = struct.unpack('>h', self.read_block(2))[0]
-                _glyph_data = self.read_block(_data_size-4-10)
+                _glyph_data = self.read_block(_data_size-4-10).rstrip(b'\x00')
 
-                self.read_block(1) # reserved
+                self.read_block(1) # terminating \0 and reserved byte
                 _glyph_checksum = ord(self.read_block(1))
             else:
                 _gd_number_of_contours = 0
@@ -322,11 +363,45 @@ class PCLParser():
                 _glyph_data = b''
                 _glyph_checksum = 0
 
-            _c = namedtuple('Glyph', ['format','desc_size','class_','id','pc','data_size','contours','x_min','y_min','x_max','y_max','data'])
-            C = _c(_format, _descriptor_size, _class, _glyph_id, chr(_glyph_id+29), _data_size, _gd_number_of_contours,_gd_x_min,_gd_y_min,_gd_x_max,_gd_y_max, _glyph_data)
+            _c = namedtuple('Glyph', ['format','descriptor_size','class_','id','pc',
+                                      'data_size','contours',
+                                      'x_min','y_min','x_max','y_max',
+                                      'data'])
 
-            self.logger.debug('ccdc: {}'.format(self.current_character_data_code))
-            self.logger.debug('{}'.format(str(C)[:139]))
+            _print = None
+            if not self.current_font_id in glyf_coordinate_to_ascii:
+                glyf_coordinate_to_ascii[self.current_font_id] = {}
+
+            try:
+                pc = glyf_coordinate_to_ascii[self.current_font_id].get(_glyph_data)
+                if not pc:
+                    pc = glyf_coordinate_to_ascii[0][_glyph_data]
+            except KeyError:
+                _print = True
+                try:
+                    # blind assumption based on past knowledge
+                    pc = chr(_glyph_id+29)
+                    glyf = [k for k,v in glyf_coordinate_to_ascii[self.current_font_id].items() if v == pc][0]
+                    del glyf_coordinate_to_ascii[self.current_font_id][glyf]
+                    glyf_coordinate_to_ascii[self.current_font_id][_glyph_data] = pc
+                    self.logger.warning('replaced glyph data for \'{}\' in font set {}'.format(pc, self.current_font_id))
+                except IndexError:
+                    _print = False
+                    glyf_coordinate_to_ascii[self.current_font_id][_glyph_data] = pc
+                    self.logger.error('glyf data not found, adding chr(\'{}\') to font set {} with {}'.format(pc, self.current_font_id, _glyph_data))
+
+            C = _c(_format, _descriptor_size, _class, _glyph_id, pc,
+                   _data_size, _gd_number_of_contours,
+                   _gd_x_min, _gd_y_min, _gd_x_max, _gd_y_max,
+                   _glyph_data)
+            print(C)
+
+            if _print is None:
+                self.logger.debug('Glyph(\x1b[1;36m{!r}\x1b[0m) stored at index[{}/{}]'.format(pc, self.current_font_id, self.current_character_data_code))
+            elif _print is True:
+                self.logger.debug('Glyph(\x1b[1;36m{!r}\x1b[0m) (by assumption) stored at index[{}/{}]'.format(pc, self.current_font_id, self.current_character_data_code))
+            elif _print is False:
+                self.logger.debug('Glyph(\x1b[1;36m{!r}\x1b[0m) (by wild assumption) stored at index[{}/{}]'.format(pc, self.current_font_id, self.current_character_data_code))
 
             self.glyph_data_blocks[self.current_font_id][self.current_character_data_code] = C
             return
@@ -342,7 +417,7 @@ class PCLParser():
 
         # raster things
         elif cmd == b'*bM':
-            decoder = {0:'default', 1:'RLE', 2:'TIFF', 3:'DeltaRow'}[int(value)]
+            decoder = {0:'Default (uncoded)', 1:'RLE', 2:'TIFF', 3:'DeltaRow'}[int(value)]
             self.logger.debug('use {} decoding on raster data'.format(decoder))
 
         # we don't do anything with this data right now
@@ -357,8 +432,10 @@ class PCLParser():
                 fh = OrderedDict()
 
                 fh['font_descriptor_size']       = struct.unpack('>H', self.read_block(2))[0]
-                fh['header_format']              = self.font_header_formats[ord(self.read_block(1))]
-                fh['font_type']                  = self.font_type[ord(self.read_block(1))]
+                _ = ord(self.read_block(1))
+                fh['header_format']              = '{}/{}'.format(_, self.font_header_formats[_])
+                _ = ord(self.read_block(1))
+                fh['font_type']                  = '{}/{}'.format(_, self.font_type[_])
                 fh['style']                      = ord(self.read_block(1)) << 8
                 self.read_block(1) # reserved
                 fh['baseline_position']          = struct.unpack('>H', self.read_block(2))[0]
@@ -366,8 +443,12 @@ class PCLParser():
                 fh['cell_height']                = struct.unpack('>H', self.read_block(2))[0]
                 fh['orientation']                = {0:'portrait',1:'landscape',2:'rev. portrait',3:'rev landscape'}[ord(self.read_block(1))]
                 fh['spacing']                    = {0:'fixed',1:'proportional'}[ord(self.read_block(1))]
-                fh['symbol_set']                 = (struct.unpack('>H', self.read_block(2))[0]*32)+(cmd[-1]-64)
-                fh['pitch']                      = struct.unpack('>H', self.read_block(2))[0]
+                _ = struct.unpack('>H', self.read_block(2))[0]
+                _set = _ >> 5
+                _term = chr((_ & 31) + 64)
+                fh['symbol_set']                 = '{}{}'.format(_set,_term)
+                _ = struct.unpack('>H', self.read_block(2))[0]
+                fh['pitch']                      = _
                 fh['height']                     = struct.unpack('>H', self.read_block(2))[0]
                 fh['x-height']                   = struct.unpack('>H', self.read_block(2))[0]
                 fh['width_type']                 = ord(self.read_block(1))
@@ -483,23 +564,40 @@ class PCLParser():
 
         # segmented font data has three parts, the SI, SS, and DS. segmented font data must terminate
         # with a null segment. if not, the font is invalidated
+        
+        # SI segment indicator
+        # SS segment size
+        # DS data segment
+        
 
         segments = []
+        do_break = False
         while size:
             SI = self.read_block(2)
             self.logger.debug('SI: {!r}'.format(SI))
-            if SI == b'\xff\xff':
-                SI = None
+
+            # sometimes we get broken font data. i hope this is a one-of issue
+            if SI in (b'\xff\xff',b'\x00\x00'):
+                do_break = True
             else:
                 SI = SI.decode()
-            ss = struct.unpack('>H', self.read_block(2))[0]
+
+            ss = 0
+            if not SI == b'\x00\x00':
+                print('reading size')
+                ss = struct.unpack('>H', self.read_block(2))[0]
+            else:
+                self.unread_block(1) # manual intervention for possibly corrupt font file
             size -= 4;
 
-            self.logger.debug('segment: (rem:{}) {} {}'.format(size, SI, ss))
+            self.logger.debug('segment: (size rem:{}) SI:{} ss:{}'.format(size, SI, ss))
 
-            if SI is None and size == 0:
+            if do_break:
                 self.logger.debug('TTF table parsing finished')
                 break
+            
+            if size <= 0:
+                self.logger.warning('table parsing failed, SI is funny!')
 
             if SI == 'PA':  # skip, this is only 1 10 byte entry...?
                 ds = self.read_block(ss)
@@ -511,7 +609,6 @@ class PCLParser():
                 _searchRange = struct.unpack('>H', self.read_block(2))[0]
                 _entrySelector = struct.unpack('>H', self.read_block(2))[0]
                 _rangeShift = struct.unpack('>H', self.read_block(2))[0]
-                size -= 12
                 self.logger.debug('{} bytes remaining'.format(size))
 
                 _tables = []
@@ -523,22 +620,42 @@ class PCLParser():
                            struct.unpack('>I', self.read_block(4))[0],
                            struct.unpack('>I', self.read_block(4))[0],
                            '')
-                    size -= 16
 
                     _tables.append(_t)
-                    self.logger.debug('{}'.format(_t))
-                    self.logger.debug('{} bytes remaining'.format(size))
+                    self.logger.debug('  {}'.format(_t))
+                
+                self.logger.debug('ss is {}, stack remaining size is {}'.format(ss, size))
+                #size -= 12                 # table header
+                #size -= len(_tables)*16    # per table
 
-                self.logger.debug('ss is {}'.format(ss))
-
-                rl = ss - 12 - (len(_tables)*16)
-                self.logger.debug('trying to read {} bytes'.format(rl))
-                blob = self.read_block(rl)
-                size -= rl
+                rs = ss - 12 - len(_tables)*16
+                self.logger.debug('trying to read {} bytes for {} tables'.format(rs, len(_tables)))
+                blob = self.read_block(rs)
+                size -= ss
                 # fill in the data sections of each table
-                for T in _tables:
-                    _data = blob[T.offset:T.offset+T.length]
+                for i,T in enumerate(_tables):
+                    if not T.length:
+                        continue
+
+                    print('blob: {}-{}'.format(T.offset,T.offset+T.length))
+                    off_start = T.offset - 12 - (16*len(_tables))
+                    _data = blob[off_start:off_start+T.length]
+
+                    if not len(_data) == T.length:
+                      self.logger.error('WHINE AND MOAN')
+
                     T = T._replace(data=_data)
+
+                    # how in hell did we overrun by 135 bytes? aka, why are we missing bytes in payload?
+                    if i == 7:
+                      if b'\x00\x00\r\x1b' in _data:
+                          self.logger.debug(_data)
+                          self.logger.error('backing up to recover ESC code, missing payload chunk')
+                          try:
+                            xpos = len(_data) - _data.rindex(b'\x00\x00\r\x1b') + 1
+                            self.unread_block(xpos)
+                          except Exception as e:
+                            traceback.print_exc()
 
             if size < 0:
                 self.logger.error('invalidate this font, data underflow')
@@ -578,6 +695,10 @@ class PCLParser():
                 self.last_x += 1
         matrix[ypos][self.last_x] = char
         self.last_x += (char.x_max//72)
+
+
+    def unread_block(self, amount):
+        self.pclblob.seek(-1*amount, io.SEEK_CUR)
 
 
     def read_block(self, amount, cmd=None, return_it=False):
@@ -759,6 +880,8 @@ class PCLParser():
         matrix       = {}
         stream = self.pclblob
         skip = b''
+        read_count = 0
+        unknown_glyph_tally = 0
         
         while 1:
             inb = stream.read(1)
@@ -773,6 +896,9 @@ class PCLParser():
                 group       = b''
                 termination = b''
                 value       = b''
+                
+                # reset count
+                unknown_glyph_tally = 0
 
                 parameter = stream.read(1)
                 
@@ -874,7 +1000,12 @@ class PCLParser():
                             elif ord(termination) in range(97, 123):
                                 termination = bytes(chr(ord(termination)-32), encoding='ascii')
 
-                            self.esc_callback(parameter+group+termination, value)
+                            try:
+                                self.esc_callback(parameter+group+termination, value)
+                            except Exception as e:
+                                self.logger.error('Error during parsing: {}'.format(e.__class__.__name__))
+                                traceback.print_exc()
+                                finish_seq = True
 
                             if finish_seq:
                                 #self.logger.debug('finished sequence')
@@ -893,28 +1024,52 @@ class PCLParser():
                 
                 else:
                     # continue until we find another ESC
-                    uesc = ''
+                    uesc = b'\x1b'
                     while 1:
-                        uesc += '{}'.format(str(parameter))
+                        uesc += parameter
                         parameter = stream.read(1)
                         if parameter == self.ESC:
                             stream.seek(-1, os.SEEK_CUR)
                             break
-                    self.logger.debug('unknown escape parameter: {}'.format(uesc))
+                    self.logger.debug('unknown escape sequence: {}'.format(uesc))
             else:
                 if self.in_pcl:
-                    #shift the printed char range by +3
-                    #self.logger.debug('inb={!r}'.format(inb))
-
                     # characters are now mapped arbitrarily with no numerical relation. fuck me
-                    pc = self.glyph_data_blocks[self.current_font_id].get(ord(inb), None)
+                    pc = self.glyph_data_blocks[self.current_font_id].get(ord(inb))
+                    
+                    if not pc: # try the manual glyph set
+                        pc = self.glyph_data_blocks[-1].get(ord(inb))
+                        if pc:
+                            self.logger.error('had to find {} in manual font'.format(pc))
+                    if not pc: # try the default glyph set
+                        pc = self.glyph_data_blocks[0].get(ord(inb))
+                        if pc:
+                            self.logger.error('had to find {} in alt font'.format(pc))
 
-                    if pc:
+                    # last ditch effort (this can garbage up things)
+                    if not pc: # try all font sets sent to us
+                        omgwtf=ord(inb)
+                        x = [x for x in [self.glyph_data_blocks[fs].get(ord(inb)) for fs in self.fonts if not fs == self.current_font_id ] if x]
+                        if x:
+                            pc = x[0]
+                            self.logger.error('had to find {} {} in alt font'.format(omgwtf, pc))
+
+                    if pc and not unknown_glyph_tally:
                         self.logger.debug('adding to final stream: {!r}'.format(pc.pc))
                         self.add_char(pc, matrix)
+                        unknown_glyph_tally=0
                     else:
+                        unknown_glyph_tally += 1
                         if not pc and not inb == b'\r':
-                            self.logger.error('unknown glyph for \x1b[1;31m{}\x1b[0m or {}'.format(inb,(ord(inb)+29)%256))
+                            # no more +29 nonsense, we now lookup glyf coords to map from arialbd.ttf
+                            self.logger.error('({}) unknown glyph id in set {}:\x1b[1;31m{:> 4}\x1b[0m, possibly:{:> 4}/{}'
+                                .format(unknown_glyph_tally, self.current_font_id,
+                                        ord(inb),
+                                        (ord(inb)+29)%256, chr((ord(inb)+29)%256))
+                                       )
+                            for cset in glyf_coordinate_to_ascii:
+                              known = ''.join(sorted([c for g,c in glyf_coordinate_to_ascii[cset].items()]))
+                              self.logger.debug(' known set {:>6} \'{}\''.format(cset, known))
 
                 else:
                     skip += inb
@@ -1048,7 +1203,10 @@ class Matrix():
                     print('preline append: {}'.format(line))
                     prelines.append(self.line_filter(line))
                     line = ''
-                line += c
+                try:
+                  line += c
+                except:
+                  pass
                 x_p = x
 
             prelines.append(self.line_filter(line))
