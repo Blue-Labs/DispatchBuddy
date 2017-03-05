@@ -1,5 +1,9 @@
 
-import threading, time, traceback, os
+import threading
+import sys
+import time
+import traceback
+import os
 
 from bottle import Bottle, default_app, run as bottle_run, route, static_file
 
@@ -94,13 +98,16 @@ class DispatchBuddy():#Bottle):
         
         self.threads.append(sm)
         
-        dbweb = DispatchBuddyWebUI(logger, config)
-        th = threading.Thread(target=dbweb.run_app, name='DB WebUI')
-        th.start()
+        #dbweb = DispatchBuddyWebUI(logger, config)
+        #th = threading.Thread(target=dbweb.run_app, name='DB WebUI')
+        #th.start()
         
-        self.threads.append((th,dbweb))
+        #self.threads.append((th,dbweb))
         
-        for p in ('/var/db/DispatchBuddy', '/var/db/DispatchBuddy/evdata', '/var/db/DispatchBuddy/pcap'):
+        for p in ('/var/db/DispatchBuddy',
+                  '/var/db/DispatchBuddy/evdata',
+                  '/var/db/DispatchBuddy/pcap',
+                  '/var/db/DispatchBuddy/tmp'):
             try:
                 os.stat(p)
             except FileNotFoundError:
@@ -115,15 +122,29 @@ class DispatchBuddy():#Bottle):
 
     def run(self):
         try:
-            self._shutdown.wait()
+            while True:
+                #sys.stderr.write('api/dispatchbuddy.py:wait()\n')
+                self._shutdown.wait(timeout=1)
+                #sys.stderr.write('write threadstack\n')
+                code = []
+                for threadId, stack in sys._current_frames().items():
+                    code.append("\n# ThreadID: {}".format(threadId))
+                    for filename, lineno, name, line in traceback.extract_stack(stack):
+                        code.append('"{}", line {}, in {}'.format(filename, lineno, name))
+                        if line:
+                            code.append("  {}".format(line.strip()))
+
+                
+                with open('/tmp/thread-stack.txt','w') as f:
+                    f.write('{}\n'.format('\n'.join(code)))
+
 
         except KeyboardInterrupt:
             print('\r', end='')
-            self._shutdown.set()
         
         except Exception as e:
-            self.logger.critical(e)
-            self.logger.critical(traceback.format_exc)
+            sys.stderr.write('======= {}\n'.format(e))
+            self.logger.critical(traceback.format_exc())
         
         finally:
             self.config.event_manager.shutdown()
@@ -133,4 +154,7 @@ class DispatchBuddy():#Bottle):
                     t.shutdown = obj.shutdown
                 self.logger.info('shutting down {}'.format(t.name))
                 t.shutdown()
-                t.join()
+                t.join(10)
+                if t.is_alive():
+                    self.logger.warning('  thread won\'t shutdown')
+        self._shutdown.set()
