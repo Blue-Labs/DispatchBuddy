@@ -109,9 +109,15 @@ class _VLAN():
 
 class _Ethernet():
     def __init__(self, dst=None, src=None, type=None):
+        #print('<< _Ethernet.__init__')
         self.dst  = dst
         self.src  = src
         self.type = type
+        #print('<< _Ethernet.__init__')
+
+    def __setstate__(self, state):
+        #print('_Ethernet.__setstate__')
+        self.__dict__.update(state)
 
     def __call__(self, *args, **kwargs):
         if len(args):
@@ -198,7 +204,6 @@ class _IP(object):
         self.dst             = dst
 
     def __getattribute__(self, *k):
-        #print('IP __getattribute__({})'.format(k))
         v = object.__getattribute__(self, *k)
         if v is None:
             return v
@@ -214,6 +219,7 @@ class _IP(object):
         return v
 
     def __call__(self, *args, **kwargs):
+        #print('>> _IP.__call__({}, {})'.format(args, kwargs))
         if len(args):
             for i,k in enumerate(['version','header_length','ds','total_length','id','flags','fragment_offset','ttl','protocol','checksum','src','dst']):
                 if i == len(args):
@@ -284,81 +290,100 @@ class _UDP(object):
         return _d
 
 
-class _TCP(object):
-    class _tcpflags(object):
-        def __init__(self, flags=None):
-            if not flags:
-                self.nonce    = False
-                self.CWR      = False
-                self.ECN_ECHO = False
-                self.URG      = False
-                self.ACK      = False
-                self.PUSH     = False
-                self.RST      = False
-                self.SYN      = False
-                self.FIN      = False
-                self._intvalue = 0
-                return
+class _tcpflags(object):
+    def __new__(cls):
+        instance = object.__new__(_tcpflags)
+        instance.nonce     = False
+        instance.CWR       = False
+        instance.ECN_ECHO  = False
+        instance.URG       = False
+        instance.ACK       = False
+        instance.PUSH      = False
+        instance.RST       = False
+        instance.SYN       = False
+        instance.FIN       = False
+        instance._intvalue = 0
+        return instance
+
+    def __init__(self, flags=0):
+        self.nonce    = (flags & 0x100)>0
+        self.CWR      = (flags & 0x80) >0
+        self.ECN_ECHO = (flags & 0x40) >0
+        self.URG      = (flags & 0x20) >0
+        self.ACK      = (flags & 0x10) >0
+        self.PUSH     = (flags & 0x8)  >0
+        self.RST      = (flags & 0x4)  >0
+        self.SYN      = (flags & 0x2)  >0
+        self.FIN      = (flags & 0x1)  >0
+        self._intvalue = flags
+
+    def __call__(self, *args, **kwargs):
+        if args:
+            flags = args[0]
             self.nonce    = (flags & 0x100)>0
             self.CWR      = (flags & 0x80) >0
-            self.ECN_Echo = (flags & 0x40) >0
+            self.ECN_ECHO = (flags & 0x40) >0
             self.URG      = (flags & 0x20) >0
             self.ACK      = (flags & 0x10) >0
             self.PUSH     = (flags & 0x8)  >0
             self.RST      = (flags & 0x4)  >0
             self.SYN      = (flags & 0x2)  >0
             self.FIN      = (flags & 0x1)  >0
-            self._intvalue = flags
 
-        def __call__(self, *args, **kwargs):
-            if args:
-                flags = args[0]
-                self.nonce    = (flags & 0x100)>0
-                self.CWR      = (flags & 0x80) >0
-                self.ECN_Echo = (flags & 0x40) >0
-                self.URG      = (flags & 0x20) >0
-                self.ACK      = (flags & 0x10) >0
-                self.PUSH     = (flags & 0x8)  >0
-                self.RST      = (flags & 0x4)  >0
-                self.SYN      = (flags & 0x2)  >0
-                self.FIN      = (flags & 0x1)  >0
+    def __setstate__(self, state):
+        #print('_tcpflags[{}] setstate'.format(id(self)))
+        self.__dict__.update(state)
+        #print('_tcpflags dict: {}'.format(self.__dict__))
 
-        def __getattribute__(self, *k):
-            #print('TCP __getattribute__({})'.format(k))
-            #prettybool={False:'\x1b[1;30mFalse\x1b[0m', True:'\x1b[1;34mTrue\x1b[0m'}
-            prettybool={False:'◻', True:'\x1b[1;32m◼\x1b[0m'}
-            if k and k[0] == '__dict__':
-                rv = { _k:prettybool[_v] for _k,_v in object.__getattribute__(self,*k).items() if not _k.startswith('_')}
-                return rv
-            else:
-                rv = True and object.__getattribute__(self,*k)
-                return rv
+    def __getattribute__(self, *k):
+        #print('[id={}]{} __getattribute__({})'.format(id(self),__class__,k))
 
-        def __eq__(self, b):
-            _tv = self._intvalue == b._intvalue
-            #print('self.flags == b.flags: {}'.format(_tv))
-            #print('{}  {}'.format(self._intvalue, b._intvalue))
-            return _tv
+        #prettybool={False:'\x1b[1;30mFalse\x1b[0m', True:'\x1b[1;34mTrue\x1b[0m'}
+        prettybool={False:'◻', True:'\x1b[1;32m◼\x1b[0m'}
+        if k and k[0] == '__dict__':
+            #return object.__getattribute__(self, '__dict__')
+        
+            #print('d>> {}'.format(object.__getattribute__(self, '__dict__').items()))
+            rv = { _k:prettybool[_v] for _k,_v in object.__getattribute__(self,*k).items() if not _k.startswith('_')}
+            return rv
+        else:
+            rv = object.__getattribute__(self,*k)
+            #print('ND "{}={}"'.format(*k,rv))
+            return rv
 
-        def __iter__(self):
-            _d = { x:getattr(self, x) for x in dir(self) if not x[0] == x[1] == '_' }
-            for k,v in _d.items():
-                yield k,v
+    def __eq__(self, b):
+        #print('_TCP.__eq__: {}'.format(b))
+        _tv = self._intvalue == b._intvalue
+        #print('self.flags == b.flags: {}'.format(_tv))
+        #print('{}  {}'.format(self._intvalue, b._intvalue))
+        return _tv
 
-        def __str__(self):
-            return '{{nonce:{nonce}, CWR:{CWR}, ECN_ECHO:{ECN_ECHO}, URG:{URG}, ACK:{ACK}, PUSH:{PUSH}, RST:{RST}, SYN:{SYN}, FIN:{FIN}}}'.format(**self.__dict__)
+    def __iter__(self):
+        _d = { x:getattr(self, x) for x in dir(self) if not x[0] == x[1] == '_' }
+        for k,v in _d.items():
+            yield k,v
+
+    def __str__(self):
+        #print('[id={}] __str__ {}'.format(id(self), self.__dict__))
+        return '{{nonce:{nonce}, CWR:{CWR}, ECN_ECHO:{ECN_ECHO}, URG:{URG}, ACK:{ACK}, PUSH:{PUSH}, RST:{RST}, SYN:{SYN}, FIN:{FIN}}}'.format(**self.__dict__)
+
+class _TCP(object):
+
+    _tcpflags = _tcpflags()
 
     def __init__(self, sport=None, dport=None, sequence_number=None, acknowledgement_number=None, header_length=None, flags=None, window_size=None, checksum=None, urgent_pointer=None, options=None):
+        self._tcpflags = _tcpflags()
         self.sport                  = sport
         self.dport                  = dport
         self.sequence_number        = sequence_number
         self.acknowledgement_number = acknowledgement_number
         self.header_length          = header_length
-        self.flags                  = flags and flags or self._tcpflags()
+        self.flags                  = flags and _tcpflags(flags) or self._tcpflags
         self.window_size            = window_size
         self.checksum               = checksum
         self.urgent_pointer         = urgent_pointer
         self.options                = options
+        #print('_TCP.flags is {}'.format(self.flags))
 
     def __call__(self, *args, **kwargs):
         if len(args):
@@ -374,6 +399,8 @@ class _TCP(object):
                         a(v)
                 else:
                     setattr(self, k, v)
+                #if k == 'flags':
+                #    print('_TCP.flags/k is {}'.format(v))
 
         if len(kwargs):
             for k, v in kwargs.items():
@@ -385,8 +412,9 @@ class _TCP(object):
         _d = { x:getattr(self, x) for x in dir(self) if not x[0] == x[1] == '_' }
         for k,v in _d:
             yield k,v
-
+    
     def __getattribute__(self, *k):
+        #print('_TCP __getattribute__ {}'.format(k))
         v = object.__getattribute__(self, *k)
         if v is None:
             return v
@@ -410,16 +438,29 @@ class _TCP(object):
 class _Packet(object):
     '''Try to resemble record format seen when using Wireshark
     '''
+    
     def __init__(self):
-        self.ethernet  = _Ethernet()
+        #print('>> _Packet.__init__')
+        self.ethernet = _Ethernet()
         self.vlans     = list()
         self.ip        = _IP()
         self.ds        = _DS()
+        self.payload   = b''
+        #print('<< _Packet.__init__')
 
+    def __setstate__(self, state):
+        #print('_Packet.__setstate__')
+        self.__dict__.update(state)
+    
     # do some magic here so we can programatically add the tcp or udp class without
     # manually doing so
     def __setattr__(self, key, value):
-        self.__dict__[key] = value
+        #if isinstance(getattr(self, key), 'type')
+        
+        object.__setattr__(self, key, value)
+        
+        #self.__dict__[key] = value
+        #print('_Packet.__setattr__:k={} v={}, vcm:{}'.format(key,value,value.__class__.__module__))
 
         if value.__class__.__module__ == self.__module__:
             try:
@@ -463,12 +504,14 @@ class Packet(object):
     returns:
         Packet object
     '''
-
+    
     def __init__(self, pktlen=0, packet=None):
+        #print('>> Packet.__init__')
         self.P = _Packet()
         self._pktlen = pktlen
         self._packet = packet
         self._parse_headers()
+        #print('<< Packet.__init__')
 
     def machex(sefl, v):
         h = ':'.join(['{0:0>2x}'.format(b) for b in v])
@@ -516,8 +559,21 @@ class Packet(object):
         yield '   Payload', P.payload
 
 
+    def __setstate__(self, state):
+        #print('setstate: {!r}'.format(state))
+        self.__dict__.update(state)
+
+
     def __getattr__(self, attr):
-        return getattr(self.P, attr)
+        #print('trying to find attr: {}'.format(attr))
+        if attr in ('ip','tcp','udp','payload'):
+            return object.__getattribute__(self.P, attr)
+        else:
+            return object.__getattribute__(self, attr)
+
+    
+    def __setattr__(self, k, v):
+        self.__dict__[k]=v
 
 
     def __iter__(self):
@@ -527,7 +583,10 @@ class Packet(object):
 
 
     def __str__(self):
-        return str(self.P)
+        try:
+            return str(self.P)
+        except Exception as e:
+            return "<Packet(Exception:{})>".format(e)
         
 
     def __repr__(self):
