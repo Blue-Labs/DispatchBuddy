@@ -2,7 +2,12 @@
 # send message
 # for each recipient, store the event ID, sending ID, and sent status in db.
 
-import re, smtplib, datetime
+import os
+import re
+import smtplib
+import datetime
+import logging
+
 from email.message import EmailMessage
 from email.utils import make_msgid
 from email.mime.text import MIMEText
@@ -12,9 +17,9 @@ from email.mime.application import MIMEApplication
 
 # put these into the configfile
 from twilio.rest import TwilioRestClient
-
 from twython import Twython
 
+logging.basicConfig(level=logging.DEBUG)
 
 media_urls = {
     # primary icons, red or blue
@@ -57,10 +62,11 @@ media_urls = {
 
 class Gateway():
     def __init__(self):
-        pass
+        self.logger = logging.getLogger('Gateway')
 
-    def deliver(self, id, rx, msg):
+    def deliver(self, id, rx, msgbody, status_recorder):
         ''' send to a single recipient
+            pass status_recorder function into call for immediacy timestamps
         '''
         gwd = getattr(self, 'deliver_'+self.gateway, None)
         if not gwd:
@@ -69,22 +75,12 @@ class Gateway():
             return
         
         # get back a tuple of the ID and Status returned from our gateway provider
-        print('sending to {}/{}'.format(self.gateway, self.mediatype))
-        statuses = gwd(id, rx, msg)
-        for s in statuses:
-            print('recording: {}'.format(s))
-            self.record_delivery(id, *s)
-
-    def record_delivery(self, event_id, recipient, delivery_id, delivery_ts, delivery_status):
-        #print('recording: {} {} {} {}'.format(eventID, sendID, sendTS, sendStatus))
-        with self.db.conn.cursor() as c:
-            c.execute('INSERT INTO event_deliveries VALUES(%s,%s,%s,%s,%s,%s,%s)',
-                (event_id, recipient, self.gateway, self.mediatype,
-                 delivery_id, delivery_ts, delivery_status))
+        self.logger.debug('sending to {}/{}'.format(self.gateway, self.mediatype))
+        gwd(id, rx, msgbody, status_recorder)
         self.db.conn.commit()
     
     
-    def deliver_twilio(self, id, rx, msg):
+    def deliver_twilio(self, id, rx, msgbody, status_recorder):
         ''' gateway gives us plenty of info, what we want out of it is:
               date_created, error_code, error_message, sid, status
               
@@ -93,12 +89,13 @@ class Gateway():
         
         send_results = []
         
-        twilio_account_sid = self.config.get('Twilio', 'twilio_account_sid')
-        twilio_auth_token  = self.config.get('Twilio', 'twilio_auth_token')
-        twilio_from        = self.config.get('Twilio', 'twilio_from')
-        twilio_client      = TwilioRestClient(twilio_account_sid, twilio_auth_token)
+        twilio_messaging_service_sid = self.config.get('Twilio', 'twilio_messaging_service_sid')
+        twilio_account_sid           = self.config.get('Twilio', 'twilio_account_sid')
+        twilio_auth_token            = self.config.get('Twilio', 'twilio_auth_token')
+        twilio_from                  = self.config.get('Twilio', 'twilio_from')
+        twilio_client                = TwilioRestClient(twilio_account_sid, twilio_auth_token)
 
-        args = {'body':msg, 'from_':twilio_from}
+        args = {'body':msgbody, 'messaging_service_sid':twilio_messaging_service_sid}
         medias = []
         if self.mediatype == 'mms':
             for rk in sorted(media_urls):
@@ -109,13 +106,16 @@ class Gateway():
                     media = 'https://southmeriden-vfd.org/images/dispatchbuddy/'+media
                     medias.append(media)
             
+            if os.getenv('TESTING'):
+                medias.append('https://southmeriden-vfd.org/images/dispatchbuddy/test.png')
+
             args['media_url'] = set(medias)
 
-        print('args list: {}'.format(args))
+        #self.logger.debug('args list: {}'.format(args))
 
         for r in rx:
             
-            print(r)
+            #self.logger.debug(r)
             addr = r.address
             
             if '@' in addr:
@@ -129,12 +129,20 @@ class Gateway():
             
             args['to'] = addr
             
-            message = twilio_client.messages.create(**args)
-            send_results.append( (message.to, message.sid, message.date_created, message.status) )
+            try:
+                message = twilio_client.messages.create(**args)
+                if message.status == 'accepted':
+                    status_recorder(recipient=message.to, delivery_id=message.sid, status='accepted')
+                else:
+                    reason = '{}: {}'.format(message.error_code, message.error_message)
+                    status_recorder(recipient=message.to, delivery_id=message.sid, status='failed', reason=reason, completed=True)
+                    self.logger.warning('twilio bad sending response: {}'.format(message))
+            except Exception as e:
+                self.logger.warning('Twilio got grumpy sending to {}@{}: {}'.format(addr, self.gateway, e))
+                status_recorder(recipient=message.to, delivery_id=message.sid, delivery_ts=message.date_created, status='failed', reason=str(e), completed=True)
 
-        return send_results
 
-    def deliver_email(self, id, rx, msgcontent):
+    def deliver_email(self, id, rx, msgbody, status_recorder):
         ''' gateway gives us plenty of info, what we want out of it is:
               date_created, error_code, error_message, sid, status
               
@@ -155,7 +163,7 @@ class Gateway():
         
         send_results = []
         
-        now = datetime.datetime.now()
+        now = datetime.datetime.utcnow()
         
         msg = EmailMessage()
         for h,v in emailheaders:
@@ -167,10 +175,10 @@ class Gateway():
         medias = []
         fdict  = {'meta_icons':'', 'magnify_icon_cid':magnify_icon_cid[1:-1]}
 
-        print('ADD MMS urls, search for keys in: {}'.format(self.evdict['nature']))
+        self.logger.debug('ADD MMS urls, search for keys in: {}'.format(self.evdict['nature']))
         for rk in sorted(media_urls):
             if re.search(rk, self.evdict['nature']) or re.search(rk, self.evdict['notes']):
-                print('found key: {}'.format(rk))
+                self.logger.debug('found key: {}'.format(rk))
                 media = media_urls.get(rk)
                 if not media:
                     media = media_urls['UNKNOWN']
@@ -179,7 +187,7 @@ class Gateway():
         
         medias = set(medias)
         
-        print('media urls: {}'.format(medias))
+        self.logger.debug('media urls: {}'.format(medias))
 
         meta_icons_t = ''
         if medias:
@@ -190,21 +198,21 @@ class Gateway():
         fdict.update({'meta_icons':meta_icons_t})
         
         for kw in ('meta_icons', 'magnify_icon_cid'):
-            msgcontent = msgcontent.replace('{{'+kw+'}}','{'+kw+'}')
+            msgbody = msgbody.replace('{{'+kw+'}}','{'+kw+'}')
         
-        msgcontent = msgcontent.format(**fdict)
+        msgbody = msgbody.format(**fdict)
         
         # now replace all the {{ and }}
-        msgcontent = msgcontent.replace('{{','{').replace('}}','}')
+        msgbody = msgbody.replace('{{','{').replace('}}','}')
         
-        msg.add_alternative(msgcontent, subtype='html')
+        msg.add_alternative(msgbody, subtype='html')
 
         with open('/var/bluelabs/DispatchBuddy/images/magnify.gif', 'rb') as img:
             msg.get_payload()[1].add_related(img.read(), 'image', 'gif', cid=magnify_icon_cid)
 
         '''
         related = MIMEMultipart(_subtype='related')
-        innerhtml = MIMEText(msg, _subtype='html')
+        innerhtml = MIMEText(msgbody, _subtype='html')
         related.attach(innerhtml)
         related.attach(icon_magnify_gif)
         '''
@@ -237,23 +245,34 @@ class Gateway():
 
         try:
             s = smtplib.SMTP(host=host, port='25')
+            #s.set_debuglevel(1)
             s.starttls()
             s.ehlo(ehlo)
             s.login(user, pass_)
-            sresponse = s.sendmail(from_, bcc, msg.as_string())
+            sresponse = s.sendmail(from_, bcc, msg.as_string(), keep_results=True)
             qresponse = s.quit()
-            print('server response: {}'.format(sresponse))
-            status='sent'
+            self.logger.debug('server sresponse: {}'.format(sresponse))
+            self.logger.debug('server qresponse: {}'.format(qresponse))
+
+            for r in bcc:
+                code,status = sresponse[r]
+                status      = status.decode().split()
+                id          = status[4]
+                status      = status[2]
+
+                try:
+                    status_recorder(recipient=r, delivery_id=id, status=status)
+                except Exception as e:
+                    self.logger.warning('unable to relay status elements to DB recorder: {}'.format(e))
+                    status_recorder(recipient=r, delivery_id=id, status='failed', reason=str(e), completed=True)
+
         except Exception as e:
-            print('Failed to send message to recipients: {}'.format(e))
-            status='failed to send'
+            self.logger.warning('Failed to send message to recipients: {}'.format(e))
+            for r in bcc:
+                status_recorder(recipient=r, delivery_id=r.gateway, status='failed', reason=str(e), completed=True)
 
-        for r in bcc:
-            send_results.append( (r, 'no-id', now, status) )
 
-        return send_results
-
-    def deliver_twitter(self, id, rx, msg):
+    def deliver_twitter(self, id, rx, msgbody, status_recorder):
         ''' gateway gives us plenty of info, what we want out of it is:
               date_created, error_code, error_message, sid, status
               
@@ -261,21 +280,21 @@ class Gateway():
         '''
         
         send_results = []
-        twitter_app_key            = self.config.get('Twilio', 'twitter_app_key')
-        twitter_app_secret         = self.config.get('Twilio', 'twitter_app_secret')
-        twitter_oauth_token        = self.config.get('Twilio', 'twitter_oauth_token')
-        twitter_oauth_token_secret = self.config.get('Twilio', 'twitter_oauth_token_secret')
+        twitter_app_key            = self.config.get('Twython', 'twitter_app_key')
+        twitter_app_secret         = self.config.get('Twython', 'twitter_app_secret')
+        twitter_oauth_token        = self.config.get('Twython', 'twitter_oauth_token')
+        twitter_oauth_token_secret = self.config.get('Twython', 'twitter_oauth_token_secret')
 
         twitter_client        = Twython(twitter_app_key, twitter_app_secret, twitter_oauth_token, twitter_oauth_token_secret)
 
-        args = {'status':msg}
+        args = {'status':msgbody}
         medias = []
         for rk in sorted(media_urls):
             # search for cues in nature and notes
             if re.search(rk, self.evdict['nature']) or re.search(rk, self.evdict['notes']):
-                print('found key:',rk)
+                self.logger.debug('found key: {}'.format(rk))
                 media = media_urls[rk]
-                print('got media id ',media)
+                self.logger.debug('got media id {}'.format(media))
                 if not media:
                     #media = media_urls['UNKNOWN']   # don't post an unknown to twitter
                     continue
@@ -287,7 +306,7 @@ class Gateway():
                             medias.append(response['media_id'])
                             break
                         except Exception as e:
-                            print('Error uploading to twitter: {}'.format(e))
+                            self.logger.warning('Error uploading to twitter: {}'.format(e))
                             retries -= 1
                             continue
 
@@ -295,13 +314,10 @@ class Gateway():
         if medias:
             args['media_ids'] = set(medias)
         
-        print('args is',args)
-        
         try:
             response = twitter_client.update_status(**args)
-            send_results.append( ('twitter', response['id'], response['created_at'], 'posted') )
+            print('twitter response: {}'.format(response))
+            status_recorder(recipient='twitter', delivery_id=response['id'], status='delivered', completed=True)
         except Exception as e:
-            send_results.append( ('twitter', 'HTTP error', datetime.datetime.now(), 'failed: {}'.format(e)) )
-
-        return send_results
-
+            status_recorder(recipient='twitter', delivery_id='HTTP error', status='failed', reason=str(e), completed=True)
+            self.logger.warning('unable to relay status elements to DB recorder: {}'.format(e))
