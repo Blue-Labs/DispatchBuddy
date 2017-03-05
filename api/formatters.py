@@ -202,15 +202,7 @@ class HTML(Formatter):
         return self.tmpl.format(**_)
 
 
-class SMS(Formatter):
-    def __init__(self, msgtype):
-        self.msgtype = msgtype
-
-    def format(self, evdict):
-        self.tmpl = '''{msgtype} at {date_time}\n  {address}\n  {nature}\n--\n{notes:.90}'''
-        return self.tmpl.format(**evdict)
-
-# not difference from PUBLIC140 right now, maybe eventually put images and map ref?
+# not different from PUBLIC140 right now, maybe eventually put images and map ref?
 class PUBLIC(Formatter):
     def __init__(self, msgtype):
         self.msgtype = msgtype
@@ -228,11 +220,19 @@ class PUBLIC140(Formatter):
         self.tmpl = '''{units} dispatched to {address} for {nature}'''
         return self.tmpl.format(**evdict)
 
+class SMS(Formatter):
+    def __init__(self, msgtype):
+        self.msgtype = msgtype
+
+    def format(self, evdict):
+        self.tmpl = '''{msgtype} at {date_time}\n  {address}\n  {nature}\n--\n{notes:.90}'''
+        return self.tmpl.format(**evdict)
+
 class MMS(Formatter):
     def __init__(self, msgtype):
         self.msgtype = msgtype
 
     def format(self, evdict):
-        self.tmpl = '''{msgtype} at {date_time}\n  {address}\n  {nature}\n--\n{notes}\n\n\
+        self.tmpl = '''{msgtype} at {date_time}\n  {address}\n  {nature}\n--\n{notes}\n\n
 Cross:\n  {cross}\n\nUnits: {units}\n\nLocation: {gmapurl}\n\nDirections: {gmapurldir}'''
         return self.tmpl.format(**evdict)
