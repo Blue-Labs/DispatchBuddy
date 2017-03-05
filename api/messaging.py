@@ -3,39 +3,58 @@
 Base class for message broadcasting
 '''
 
-import datetime, uuid, logging, os
+import datetime
+import uuid
+import logging
+import os
+import time
 import api.formatters
 import api.gateways
 
+logging.basicConfig(level=logging.DEBUG)
+
 class Messaging(api.gateways.Gateway):
-    def __init__(self, gateway=None, mediatype=None):
+    def __init__(self, db, config, gateway, mediatype, id, evdict):
+        self.db        = db
+        self.config    = config
         self.gateway   = gateway
         self.mediatype = mediatype
-        self.db        = None
+        self.id        = id
+        self.evdict    = evdict
         self.xmd       = {} # dictionary of messages to be transmitted
-        self.logger    = logging.getLogger()
+        self.logger    = logging.getLogger('Messaging')
     
 
-    def set_config(self, db, config):
-        self.db = db
-        self.config = config
-
-
-    def _run(self, gateway, mediatype, id, evdict):
-        self.gateway   = gateway
-        self.mediatype = mediatype
-        self.evdict    = evdict
-
+    def _run(self):
         rx = self.select_recipient_list()
         if not rx:
-            print('no recipients for {}/{}'.format(gateway, mediatype))
+            self.logger.info('no recipients for {}/{}'.format(self.gateway, self.mediatype))
             return
 
-        msg = self.format_message(evdict)
+        msg = self.format_message(self.evdict)
 
-        #self.logger.debug('formatted msg for {}/{} is: {!r}'.format(gateway, mediatype, msg))
+        #self.logger.debug('formatted msg for {}/{} is: {!r}'.format(self.gateway,
+        #                  self.mediatype, msg))
 
-        self.deliver(id, rx, msg)
+        self.deliver(self.id, rx, msg, self._status_recorder)
+
+        rxd=[]
+        for r in rx:
+            ra = r.address
+            if r.mediatype.lower() in ('mms','sms') and not r.address[0:1]=='+1':
+                ra = '+1'+r.address
+            rxd.append((r.gateway, r.mediatype, ra))
+
+        return rxd
+
+
+    def _status_recorder(self, *args, **kwargs):
+        # event_uuid,recipient,gateway,mediatype,delivery_id,delivery_ts,delivery_status
+        # args: to, id, ts, status
+        self.db.store_transmitted_message_status(
+            event_uuid=self.id, gateway=self.gateway, mediatype=self.mediatype,
+            **kwargs
+        )
 
 
     def select_recipient_list(self):
@@ -46,11 +65,9 @@ class Messaging(api.gateways.Gateway):
         dow = now.strftime('%a').lower()
         now = now.time().replace(second=0, microsecond=0)
         
-        if not self.db:
-          print('omgwtf no db')
-        
+        # this should be thread locked
         while not self.db.recipient_list:
-          print('waiting for db to get RX list')
+          self.logger.info('waiting for db to get RX list')
           time.sleep(1)
         
         
@@ -64,7 +81,7 @@ class Messaging(api.gateways.Gateway):
         # override RX list with only 'testing=True' recipients
         if os.getenv('TESTING'):
             rx = [r for r in rx if r.testing == True]
-            print(rx)
+            #self.logger.debug(rx)
 
         return rx
 
