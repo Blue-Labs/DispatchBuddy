@@ -37,6 +37,7 @@ class SensorManager(threading.Thread):
         self.logger    = logger
         self.config    = config
         self.name      = 'Sensor Manager'
+        self.setName('SensorManager')
         self._shutdown = threading.Event()
 
 
@@ -67,7 +68,7 @@ class SensorManager(threading.Thread):
             pass
         
         except Exception as e:
-            self.logger.critical('oh shit: {}'.format(e))
+            self.logger.critical('unexected error: {}'.format(e))
             self.logger.critical(traceback.format_exc)
     
         finally:
@@ -79,9 +80,9 @@ class SensorManager(threading.Thread):
                     for th,_c in th_dict.items():
                         self.logger.info('  handler stop: {}'.format(th.name))
                         _c.shutdown()
-                        #self.logger.debug('  t.join({})'.format(th.name))
-                        th.join()
-                        #self.logger.debug('  {} exited'.format(th.name))
+                        th.join(2)
+                        if th.is_alive():
+                            self.logger.warning('    thread won\'t shutdown')
 
         self.logger.debug('SensorManager terminated')
 
