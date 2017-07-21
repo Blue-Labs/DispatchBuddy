@@ -4,6 +4,7 @@ import sys
 import time
 import traceback
 import os
+import shutil
 
 from bottle import Bottle, default_app, run as bottle_run, route, static_file
 
@@ -32,7 +33,7 @@ bottle part of this needs to accomplish the following:
         edit templates?
         research dispatches that match query language
         statistics
-        
+
 '''
 
 
@@ -48,7 +49,7 @@ class DispatchBuddyWebUI(Bottle):
         self.route('/css/<filename>', callback=self.web_css)
         self.route('/js/<filename>', callback=self.web_js)
         self.route('/images/<filename>', callback=self.web_images)
-        
+
     def web_index(self):
         return static_file('index.html', root='/var/bluelabs/DispatchBuddy/htdocs')
     def web_css(self, filename):
@@ -72,14 +73,14 @@ class DispatchBuddyWebUI(Bottle):
         except KeyboardInterrupt:
             print('\r', end='')
             self._shutdown.set()
-        
+
         except Exception as e:
             self.logger.critical(e)
             self.logger.critical(traceback.format_exc)
-        
+
         finally:
             self.logger.info('shutting down web UI')
-        
+
 
 
 
@@ -93,25 +94,31 @@ class DispatchBuddy():#Bottle):
         self._shutdown = threading.Event()
         config.event_manager = EventManager(logger, config)
         sm = SensorManager(logger, config)
-        
+
         sm.start()
-        
+
         self.threads.append(sm)
-        
+
         #dbweb = DispatchBuddyWebUI(logger, config)
         #th = threading.Thread(target=dbweb.run_app, name='DB WebUI')
         #th.start()
-        
+
         #self.threads.append((th,dbweb))
-        
+
         for p in ('/var/db/DispatchBuddy',
+                  '/var/db/DispatchBuddy/celery.results',
                   '/var/db/DispatchBuddy/evdata',
                   '/var/db/DispatchBuddy/pcap',
-                  '/var/db/DispatchBuddy/tmp'):
+                  '/var/db/DispatchBuddy/tmp',
+                  ):
             try:
                 os.stat(p)
             except FileNotFoundError:
                 os.mkdir(p, 0o700)
+                shutil.chown(p,
+                             user=config.get('main', 'run as user'),
+                             group=config.get('main', 'run as group')
+                             )
             except:
                 traceback.print_exc()
 
@@ -134,18 +141,18 @@ class DispatchBuddy():#Bottle):
                         if line:
                             code.append("  {}".format(line.strip()))
 
-                
+
                 with open('/tmp/thread-stack.txt','w') as f:
                     f.write('{}\n'.format('\n'.join(code)))
 
 
         except KeyboardInterrupt:
             print('\r', end='')
-        
+
         except Exception as e:
             sys.stderr.write('======= {}\n'.format(e))
             self.logger.critical(traceback.format_exc())
-        
+
         finally:
             self.config.event_manager.shutdown()
             for t in self.threads:
