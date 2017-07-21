@@ -30,10 +30,11 @@ app = Celery('tasks')
 celery_config = dict(
     CELERY_TASK_SERIALIZER             = 'json',
     CELERY_ACCEPT_CONTENT              = ['json'],  # Ignore other content
-    CELERY_RESULT_SERIALIZER           = 'json',
     CELERY_TIMEZONE                    = 'America/New_York',
     CELERY_ENABLE_UTC                  = True,
-    CELERY_RESULT_BACKEND              = 'amqp',
+    CELERY_RESULT_BACKEND              = 'file:///var/db/DispatchBuddy/celery.results',  # was amqp
+    CELERY_RESULT_PERSISTENT           = True,
+    CELERY_RESULT_SERIALIZER           = 'json',
     CELERY_IGNORE_RESULT               = False,
     CELERY_TRACK_STARTED               = True,
     CELERY_EAGER_PROPAGATES_EXCEPTIONS = True,
@@ -127,7 +128,7 @@ def preshutdown(*args, **kwargs):
 def dispatch_job(self, id, payload):
         ''' Decode the PCL data and extract textual words, store in database, and if
             unique, broadcast it to all of our configured gateways
-            
+
               payload: string
         '''
 
@@ -175,9 +176,9 @@ def dispatch_job(self, id, payload):
         logger.info('res: {}'.format(res))
 
         #self.db_print_remote(id)
-        
 
-        
+
+
 
 
 def store_event(id, payload, ev):
@@ -251,30 +252,33 @@ def Maleman(gateway, mediatype, id, evdict):
 
 @app.task
 def db_broadcast(id, evdict):
-        # parent broadcaster that initiates tasks to send to each type of media
-        # get a sorted list of tuples for each gateway:media combo
+    # parent broadcaster that initiates tasks to send to each type of media
+    # get a sorted list of tuples for each gateway:media combo
+    try:
         gateway_medias = sorted(set([ (x.gateway,x.mediatype) for x in DB.recipient_list ]))
-        print(gateway_medias)
+        logger.debug('{}'.format(gateway_medias))
+    except Exception as e:
+        logger.error('db_broadcast() error: {}'.format(e))
 
-        tasks = []
+    tasks = []
 
-        for g,m in gateway_medias:
-            # having multiple threads writing to the DB connection isn't safe, this needs to change
-            # not a problem now, each worker has its own DB connection
+    for g,m in gateway_medias:
+        # having multiple threads writing to the DB connection isn't safe, this needs to change
+        # not a problem now, each worker has its own DB connection
 
-            # overlay sync bug means add None to the end of these args or the Task() class
-            # will think we're missing an arg
-            t = Maleman.s(g, m, id, evdict)
-            tasks.append(t)
+        # overlay sync bug means add None to the end of these args or the Task() class
+        # will think we're missing an arg
+        t = Maleman.s(g, m, id, evdict)
+        tasks.append(t)
 
-        return group(tasks)
+    return group(tasks)
 
 
 @app.task
 def delivery_report(res, id):
     # REST call to generate a delivery report
     rxlist = [r[0]+'/'+r[1]+'/'+r[2] for resi in res if resi for r in resi]
-    
+
     logger.debug('>>>>>>>>>>>>>> do delivery report for: {} {}'.format(rxlist,id))
     r = requests.post('https://smvfd.info/dispatchbuddy/event-delivery-report', data={'id':id, 'rxlist':rxlist}, timeout=30)
     logger.debug('report request: {}'.format(r))
