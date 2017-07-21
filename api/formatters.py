@@ -4,7 +4,7 @@
 class Formatter():
     def __init__(self):
         pass
-    
+
     @property
     def hippa_text(self):
         return '''\
@@ -17,11 +17,11 @@ class Formatter():
         This information is sensitive and must be protected according to all
         applicable laws, regulations, and policies including federal HIPAA
         requirements.
-        
+
         "HIPAA" is an acronym for the Health Insurance Portability
         & Accountability Act of 1996 (August 21), Public Law 104-191, which
         amended the Internal Revenue Service Code of 1986.
-        
+
         You may be fined up to $250K and/or imprisoned up to 10 years for
         knowing misuse of individually identifiable health information in addition
         to any state law or local ordinances per federal HIPAA regulations.'''
@@ -71,7 +71,7 @@ class Formatter():
           }
 
           table.event {
-             width:100%;
+             word-break:break-word;
              border-collapse:collapse;
              border:none;
              margin-right:0;
@@ -121,7 +121,7 @@ class Formatter():
              border:1px solid black;
              padding:.5em;
           }
-          
+
           img.meta_icon {
             display:inline-block;
           }
@@ -138,7 +138,7 @@ class Formatter():
 class HTML(Formatter):
     def __init__(self, msgtype):
         self.msgtype = msgtype
-    
+
     def format(self, evdict):
         self.tmpl = '''\
         <!DOCTYPE>
