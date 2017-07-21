@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-__version__  = '4.7'
+__version__  = '4.8'
 __author__   = 'David Ford <david.ford@southmeriden-vfd.org>'
-__date__     = '2017-Mar-5'
+__date__     = '2017-Jul-21'
 __title__    = 'DispatchBuddy'
 __license__  = 'Apache 2'
 
@@ -73,10 +73,10 @@ def main():
         logger.setLevel(loglevel)
 
     logger.setLevel(numeric_level)
+    formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-.1s %(name)s ⨹ %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
     try:
         handler   = logging.handlers.TimedRotatingFileHandler(logfile, when='midnight', backupCount=14, encoding='utf-8')
-        formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-.1s %(name)s ⨹ %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
     except:
@@ -85,6 +85,7 @@ def main():
 
     if config.get('Logging','log console'):
         ch = logging.StreamHandler()
+        ch.setLevel(logging.WARNING)
         ch.setFormatter(formatter)
         logger.addHandler(ch)
 
@@ -92,15 +93,14 @@ def main():
     # k=asdf
     # v=234 # comment
 
-
     logger.info('DispatchBuddy v{}'.format(__version__))
-    
+
     # make sure there's a dispatchbuddy cgroup
     # and make sure our pid is slotted into it
     try:
         os.stat('/sys/fs/cgroup/cpu,cpuacct/dispatchbuddy')
     except FileNotFoundError:
-        mkdir('/sys/fs/cgroup/cpu,cpuacct/dispatchbuddy')
+        os.mkdir('/sys/fs/cgroup/cpu,cpuacct/dispatchbuddy')
 
     # writing a 0 registers my own pid in the file
     try:
@@ -117,21 +117,22 @@ def main():
             f.write('{}\n'.format(total_shares//2))
     except Exception as e:
         logger.warning('failed to write "{}" to cgroup.shares file: {}'.format(total_shares/2, e))
-    
+
     logger.info('stdin is a tty: {}'.format(sys.stdin.isatty()))
-    
+
     try:
         db = DispatchBuddy(logger, config)
     except Exception as e:
         logger.error('Failed to start: {}'.format(e))
         traceback.print_exc()
-    prctl.set_name('DB v{}'.format(__version__))
-    prctl.set_proctitle('DispatchBuddy v{}'.format(__version__))
+
+    #prctl.set_name('DB v{}'.format(__version__))
+    #prctl.set_proctitle('DispatchBuddy v{}'.format(__version__))
 
     db.run()
 
     logger.warn('main() shutdown')
-    
+
 
 if __name__ == '__main__':
     main()
