@@ -43,14 +43,14 @@ class PCLParser():
     reset_pcl_engine = b'E'                     # resets
     reset_lrmargins  = b'9'
     printable        = list(range(8,14)) +list(range(32+3, 127+3))
-    
+
     parse_error      = False
-    
+
     # state tracking
     in_pcl           = True
     current_character_data_code = 0
     current_font_id  = 0
-    
+
     # positional
     last_x		 = 0
     last_y		 = 0
@@ -59,10 +59,10 @@ class PCLParser():
     # PCL color palette
     pcl_color_palette    = {n:0 for n in range(8)}
     pcl_color            = {'R':0, 'G':0, 'B':0} # RGB
-    
+
     requiresdata = (b"&pX", b"(sW", b")sW", b"*bW", b'*vW', b'*oW', b'(', b')')  # List of known commands that required data section
     f = {a:None for a in ('stream', 'length', 'position')}
-    
+
     simplex =                       ( "simplex", "duplex - long edge", "duplex - short edge" )
     duplex_side =                   ( "next side", "front side", "back side" )
     job_separation =                ( "disable", "enable" )
@@ -126,7 +126,7 @@ class PCLParser():
            88:_c(x_max=428, pc='\\?'),
          },                                        # educated guess
     }
-    
+
     # common defined escape sequences
     # http://www.manualslib.com/manual/277365/Hp-Pcl-5.html
     # http://www.hp.com/ctg/Manual/bpl13210.pdf
@@ -225,29 +225,29 @@ class PCLParser():
         if not (data or filename):
             raise Exception ("specify a data block or filename to load from")
             return
-        
+
         self.filename=filename
         if data:
             self.pclblob = io.BytesIO(data)
-        
+
         else:
             try:
                 s = os.stat(self.filename)
             except (OSError, IOError) as e:
                 raise Exception ("error accessing {}, {}, {}".format(self.filename, e.errno, e))
                 return
-        
+
             with open(self.filename, "rb") as file:
                 self.pclblob = io.BytesIO(file.read())
                 file.close()
-        
+
         self.pclblob.seek(io.SEEK_SET, 0)
 
 
     def is_cmd(self, string):
         return string in self.escs
-    
-    
+
+
     def esc_callback(self, cmd, value):
         title, textra = self.escs.get(cmd, ('[1;36munknown command[0m', None))
         if title == '[1;36munknown command[0m':
@@ -255,7 +255,7 @@ class PCLParser():
 
         cmds = str(cmd, encoding='ascii')
         value = str(value, encoding='ascii')
-        
+
         if self.in_pcl:
             cword = "\x1b[1;32mcommand\x1b[0m:"
         else:
@@ -265,7 +265,7 @@ class PCLParser():
 
         if cmd == b'*lO' and value == b'252':
             self.logger.debug('[1;30mSTART PRINTING SOMETHING [0m')
-        
+
         elif cmd in (b'(', b')'):
             if cmd == b'(':
                 self.logger.debug('choose primary font, symbol set ID {}'.format(value))
@@ -291,7 +291,7 @@ class PCLParser():
         elif cmd == b'*vI':
             self.pcl_color_palette[int(value)] = self.pcl_color
             self.logger.debug('set PCL color palette[{}] to {}'.format(int(value), self.pcl_color))
-        
+
         elif cmd == self.UEL:
             self.logger.debug('Exiting PCL engine')
             self.in_pcl = False
@@ -299,22 +299,22 @@ class PCLParser():
         elif cmd == self.reset_pcl_engine:
             self.logger.debug('Entering PCL engine')
             self.in_pcl = True
-        
+
         elif cmd == self.pcl_to_hpgl2:
             self.logger.debug('Exiting PCL engine, consume until ESC')
             self.in_pcl = False
-            
+
         elif cmd == self.hpgl2_to_pcl:
             self.logger.debug('Entering PCL engine')
             self.in_pcl = True
-        
+
         elif cmd == b'*cD':
             self.current_font_id = int(value)
             if not self.current_font_id in self.fonts:
                 self.fonts[self.current_font_id] = None
             if not self.current_font_id in self.glyph_data_blocks:
                 self.glyph_data_blocks[self.current_font_id] = {}
-        
+
         elif cmd == b'(X':
             self.current_font_id = int(value)
 
@@ -322,7 +322,7 @@ class PCLParser():
         elif cmd == b'*cE':
             self.logger.debug('load char to printer: {}'.format(value))
             self.current_character_data_code = int(value)
-        
+
         # load character, pg 11-67 of http://data.manualslib.com/pdf2/28/2774/277365-hp/pcl_5.pdf?d37285c979e3d5cb83a8156d3f1e8b66
         elif cmd == b'(sW':
             # read character data
@@ -331,7 +331,7 @@ class PCLParser():
             _continuation = self.read_block(1) == b'\x01'
             _descriptor_size = ord(self.read_block(1))
             _class = ord(self.read_block(1))
-            
+
             if _descriptor_size == 2:
                 _descriptor_additional = ''
             else:
@@ -564,11 +564,11 @@ class PCLParser():
 
         # segmented font data has three parts, the SI, SS, and DS. segmented font data must terminate
         # with a null segment. if not, the font is invalidated
-        
+
         # SI segment indicator
         # SS segment size
         # DS data segment
-        
+
 
         segments = []
         do_break = False
@@ -595,7 +595,7 @@ class PCLParser():
             if do_break:
                 self.logger.debug('TTF table parsing finished')
                 break
-            
+
             if size <= 0:
                 self.logger.warning('table parsing failed, SI is funny!')
 
@@ -623,7 +623,7 @@ class PCLParser():
 
                     _tables.append(_t)
                     self.logger.debug('  {}'.format(_t))
-                
+
                 self.logger.debug('ss is {}, stack remaining size is {}'.format(ss, size))
                 #size -= 12                 # table header
                 #size -= len(_tables)*16    # per table
@@ -661,7 +661,7 @@ class PCLParser():
                 self.logger.error('invalidate this font, data underflow')
 
         return segments
-    
+
 
     '''
     find a nearby (vertical offset) line that is within 10 dot lines. this is caused by
@@ -684,11 +684,11 @@ class PCLParser():
         #leftside = self.last_x
 
         #self.logger.debug('last_y:{} last_x:{} ypos:{}'.format(self.last_y, self.last_x, ypos))
-        
+
         # if we haven't printed on this line, add line to matrix
         if not ypos in matrix:
             matrix[ypos] = {}
-        
+
         if self.last_x in matrix[ypos]:
             # char printed on top of another -- we'll record it on the right side of the original char
             while self.last_x in matrix[ypos] and matrix[ypos][self.last_x]:
@@ -703,14 +703,14 @@ class PCLParser():
 
     def read_block(self, amount, cmd=None, return_it=False):
         stream = self.pclblob
-        
+
         if cmd == None:
             return_it = True
 
         # occasionally we get a stream offset
         skip_offset = stream.seek(0, os.SEEK_CUR)
         #self.logger.debug('Command {0} wants to read {1} bytes at offset: {2}'.format(cmd,amount,skip_offset))
-        
+
         # if this was *bW, read until we find *rB or *rC
         position = None
         data = b''
@@ -762,48 +762,48 @@ class PCLParser():
                 return data
 
             zlen = len(data)
-        
+
             if self.ESC+b'*' in data:
                 position = data.find(self.ESC+b'*')
                 y2 = stream.seek(-(zlen-position), os.SEEK_CUR)
                 self.logger.warning('\x1b[1;33mwarning, \\x1b* first found inside data after {} bytes; backing up to that\x1b[0m'.format(position-1, amount))
-        
+
         if not zlen == amount:
             self.logger.warning('rohroh, we read {} bytes of {}'.format(zlen,amount))
             pass
 
         self.logger.debug('read {} bytes'.format(len(data)))
-        
+
         if not len(data) == amount:
             self.block_pprint(data, amount)
         else:
             self.block_pprint(data)
-        
+
 
     def block_pprint(self, block, olen=None):
-    
+
         if olen:
            self.logger.warning('wanted {}, got {}'.format(olen, len(block)))
         if False:
             return
-        
+
         _width = 32
-    
+
         # make it sort of readable
         count = 0
         pblock = []
-        
+
         def hexdumpline(data, width=32):
             hsx = []
             cc  = len(data)
             for _c in data:
               _c = _c == '\x1b' and '\x1b[1;41;37m1b\x1b[0m' or '{:02x}'.format(ord(_c))
               hsx.append(_c)
-            
+
             hs = ' '.join(hsx)
             ts =  ''.join([31 < ord(_c) < 127 and _c or '.' for _c in data])
             return (hs,ts)
-        
+
         ts = ''
         for c in block:
           if len(ts) == _width:
@@ -811,12 +811,12 @@ class PCLParser():
             pblock.append( hexdumpline(ts, _width) )
             ts  = ''
           ts += chr(c)
-        
+
         if ts:
             pblock.append( hexdumpline(ts, _width) )
-        
+
         all_good = block.endswith(b'\0\0\0\0')
-        
+
         if all_good:
             _last,_last_s = pblock.pop()
             _last_len = len(_last)
@@ -846,7 +846,7 @@ class PCLParser():
               a += ' '*suffix_add
               pblock.append((h,a))
               underflow -= suffix_add
-            
+
             loop = (underflow//_width)
             for l in range(loop):
                 _ = '\x1b[1;31m'+' '.join(['\u2610\u2610']*_width)+'\x1b[0m'
@@ -863,7 +863,7 @@ class PCLParser():
               if all_good:
                 h = h[:-1]
             self.logger.debug('{}  {}'.format(h,a))
-        
+
         '''
         for c in block:
             if olen and count == olen:
@@ -874,7 +874,7 @@ class PCLParser():
         #z = re.sub('\*rB', '\x1b[1;32m*rB\x1b[0m', z)
         #z = re.sub('0x0\s+0x0\s+', '\x1b[1;35m0x0 0x0 \x1b[0m', z)
         '''
-    
+
 
     def parse(self):
         matrix       = {}
@@ -882,7 +882,7 @@ class PCLParser():
         skip = b''
         read_count = 0
         unknown_glyph_tally = 0
-        
+
         while 1:
             inb = stream.read(1)
             #self.logger.debug('stream read: {0}'.format(inb))
@@ -896,21 +896,21 @@ class PCLParser():
                 group       = b''
                 termination = b''
                 value       = b''
-                
+
                 # reset count
                 unknown_glyph_tally = 0
 
                 parameter = stream.read(1)
-                
+
                 if not parameter:
                     logger.debug('break on !parameter')
                     break;
-                
+
                 # short commands (the next character must not be a group character)
                 if parameter in (b'E', b'9'):
                     self.esc_callback(parameter, value)
                     continue
-                
+
                 if ord(parameter) in self.t_parameter:
                     #self.logger.debug('{0} is parameterized'.format(parameter))
 
@@ -934,13 +934,13 @@ class PCLParser():
                         while 1:
                             #self.logger.debug('{0} is grouped'.format(group))
                             value       = b''
-                            
+
                             # if the two HP-GL/2 commands, short circuit
                             #self.logger.debug('group is: {!r}'.format(group))
                             if group in (b'0',b'1'):
                                 inz = stream.read(1)
                                 self.logger.debug('GL/2 command: {0}'.format(inz))
-                                
+
                                 if inz in (b'A',b'B'):
                                     value = group
                                     group = b''
@@ -961,8 +961,8 @@ class PCLParser():
                                         self.logger.debug(' unexpected: {}'.format(inz))
                                     if finish_seq:
                                         break
-                                    
-                            
+
+
                             while 1:
                                 inz = stream.read(1)
                                 if len(inz):
@@ -972,12 +972,12 @@ class PCLParser():
                                         stream.seek(-1, os.SEEK_CUR)
                                         #self.logger.debug('end of value: {0}'.format(inz))
                                         break
-                                
-                            
+
+
                             #self.logger.debug('{0} has a value'.format(value))
-                        
+
                             termination = stream.read(1)
-                            
+
                             # not a valid terminator?
                             if not ord(termination) in list(range(64, 91))+ list(range(97, 123)):
                                 self.logger.warning('invalid terminator? {0}'.format(termination))
@@ -1010,18 +1010,18 @@ class PCLParser():
                             if finish_seq:
                                 #self.logger.debug('finished sequence')
                                 finished = True
-                                
+
                                 break
 
                             #self.logger.debug('continuing')
                             continue
-                    
+
                         if finished:
                             #self.logger.debug('exit ESC processing')
                             continue
 
                     #self.logger.debug('invalid escape sequence found? {0}'.format(parameter+group+value+termination))
-                
+
                 else:
                     # continue until we find another ESC
                     uesc = b'\x1b'
@@ -1036,7 +1036,7 @@ class PCLParser():
                 if self.in_pcl:
                     # characters are now mapped arbitrarily with no numerical relation. fuck me
                     pc = self.glyph_data_blocks[self.current_font_id].get(ord(inb))
-                    
+
                     if not pc: # try the manual glyph set
                         pc = self.glyph_data_blocks[-1].get(ord(inb))
                         if pc:
@@ -1088,7 +1088,7 @@ class PCLParser():
             for x in xmatrix:
                 mline += '({},{}) '.format(x,(matrix[y][x]).pc, end='')
             mline += '\n'
-                
+
         self.logger.debug(mline)
 
         M = Matrix(self.logger, self.id)
@@ -1099,7 +1099,7 @@ class Matrix():
     parse_error      = False
     # set defaults and make sure all keys exist
 
-    
+
     def __init__(self, logger=None, id=None):
         self.logger = logger
 
@@ -1148,7 +1148,7 @@ class Matrix():
                 line = line.replace('Time Out:', 'time_out:')
 
         return line
-    
+
 
     def post_filters(self):
         ev = self.ev
@@ -1156,7 +1156,7 @@ class Matrix():
         x           = parser.parse (ev.date + 'T' + ev.time_out + time.strftime('%z'))
         self.ev_update('isotimestamp', str(x))
         self.ev_update('date_time', x.strftime('%b%d, ')+x.strftime('%l:%M%P').strip())
-        
+
         # add inhouse generated data
         if ev.address:
             # make the address more readable
@@ -1165,7 +1165,7 @@ class Matrix():
             daddr = ev.address.replace(' ', ',')
             self.ev_update('gmapurl', 'https://www.google.com/maps/place/{daddr},+Meriden,+CT+06451'.format(daddr=daddr))
 
-            saddr = '+31,+Camp,+St,+Meriden,+CT+06451'
+            saddr = 'South+Meriden+Volunteer+Fire+Department,+31,+Camp,+Street,+Meriden,+CT+06451'
             self.ev_update('gmapurldir', 'https://www.google.com/maps/dir/{saddr}/{daddr},+Meriden,+CT+06451'.format(daddr=daddr,saddr=saddr))
 
 
@@ -1176,7 +1176,7 @@ class Matrix():
         #cross        = None
         #nature       = None
         #notes        = None
-        
+
         # prebuild lines, splitting lines where appropriate
         # x (horizontal movement) is our X,Y geometry reference. if our current X is greater than
         # x_p, we're evaluating a new line. if not, it's [possibly a slight offset]
@@ -1184,7 +1184,7 @@ class Matrix():
         for y in sorted(matrix):
             xmatrix = sorted([(x,g.pc) for x,g in matrix[y].items()])
             print('matrix:  {:<5} {}'.format(y, xmatrix))
-            
+
             # line continuation?
             if prelines and xmatrix[0][0] > 1000:
                 line = prelines.pop()+' '
@@ -1210,9 +1210,9 @@ class Matrix():
                 x_p = x
 
             prelines.append(self.line_filter(line))
-        
+
         del (matrix)
-        
+
         for pl in prelines:
             print('pl: {}'.format(pl))
 
@@ -1228,17 +1228,17 @@ class Matrix():
             # test for \w+:
             # if it's a recognized keyword, process it
             # if not, check to see if we have cross or notes set, if so, append it to the appropriate line
-            
+
             # ignore this word
             if line == 'END':
                 #self.logger.debug('  ignored')
                 continue
-            
+
             # no longer applicable
             #    if line.lower() in ('dispatch','dispose','update','en route','on scene'):
             #        beginning = False
             #        self.ev_update('msgtype', line.lower())
-            
+
             else:
                 m = re.match('(\w+(?:\s\w+|)):(.*)', line)
                 if m:
@@ -1287,10 +1287,10 @@ class Matrix():
                         nature  += line
                     elif notes:
                         notes   += line
-                        
+
                     self.logger.debug('  append this line')
                 '''
-        
+
         '''
         if address:
             self.ev_update('address', address)
