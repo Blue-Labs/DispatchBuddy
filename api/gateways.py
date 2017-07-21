@@ -73,22 +73,22 @@ class Gateway():
             self.logger.critical('delivery method for {} not known'.format(self.gateway))
             #raise NotImplementedError
             return
-        
+
         # get back a tuple of the ID and Status returned from our gateway provider
         self.logger.debug('sending to {}/{}'.format(self.gateway, self.mediatype))
         gwd(id, rx, msgbody, status_recorder)
         self.db.conn.commit()
-    
-    
+
+
     def deliver_twilio(self, id, rx, msgbody, status_recorder):
         ''' gateway gives us plenty of info, what we want out of it is:
               date_created, error_code, error_message, sid, status
-              
+
               we'll parse the error_code and error_message and return them in sendStatus
         '''
-        
+
         send_results = []
-        
+
         twilio_messaging_service_sid = self.config.get('Twilio', 'twilio_messaging_service_sid')
         twilio_account_sid           = self.config.get('Twilio', 'twilio_account_sid')
         twilio_auth_token            = self.config.get('Twilio', 'twilio_auth_token')
@@ -105,7 +105,7 @@ class Gateway():
                         media = media_urls['UNKNOWN']
                     media = 'https://southmeriden-vfd.org/images/dispatchbuddy/'+media
                     medias.append(media)
-            
+
             if os.getenv('TESTING'):
                 medias.append('https://southmeriden-vfd.org/images/dispatchbuddy/test.png')
 
@@ -114,21 +114,21 @@ class Gateway():
         #self.logger.debug('args list: {}'.format(args))
 
         for r in rx:
-            
+
             #self.logger.debug(r)
             addr = r.address
-            
+
             if '@' in addr:
                 addr = addr.split('@',1)[0]
             if len(addr) == 10:
                 addr = '+1'+addr
-            
+
             if not re.fullmatch('\+1\d{10}', addr):
                 self.logger.warning('recipient address malformed for {}; {}'.format(addr, self.gateway))
                 continue
-            
+
             args['to'] = addr
-            
+
             try:
                 message = twilio_client.messages.create(**args)
                 if message.status == 'accepted':
@@ -145,7 +145,7 @@ class Gateway():
     def deliver_email(self, id, rx, msgbody, status_recorder):
         ''' gateway gives us plenty of info, what we want out of it is:
               date_created, error_code, error_message, sid, status
-              
+
               we'll parse the error_code and error_message and return them in sendStatus
         '''
         urgheaders = [
@@ -154,21 +154,21 @@ class Gateway():
            ('Importance','High'),
            ('X-MMS-Priority','Urgent')
         ]
-        
+
         emailheaders = [
            ('To', 'SMVFD'),
            ('From', 'DispatchBuddy <m@smvfd.info>'),
            ('Subject', 'Fire Dispatch: {address}'.format(address=self.evdict['address'])),
         ]
-        
+
         send_results = []
-        
+
         now = datetime.datetime.utcnow()
-        
+
         msg = EmailMessage()
         for h,v in emailheaders:
             msg[h]=v
-        
+
         msg.set_content('This is an HTML only email')
         magnify_icon_cid = make_msgid()
 
@@ -184,9 +184,9 @@ class Gateway():
                     media = media_urls['UNKNOWN']
                 media = 'https://southmeriden-vfd.org/images/dispatchbuddy/icon-'+media
                 medias.append(media)
-        
+
         medias = set(medias)
-        
+
         self.logger.debug('media urls: {}'.format(medias))
 
         meta_icons_t = ''
@@ -196,15 +196,15 @@ class Gateway():
                 meta_icons_t += '<img class="meta_icons" src="{url}">'.format(url=url)
 
         fdict.update({'meta_icons':meta_icons_t})
-        
+
         for kw in ('meta_icons', 'magnify_icon_cid'):
             msgbody = msgbody.replace('{{'+kw+'}}','{'+kw+'}')
-        
+
         msgbody = msgbody.format(**fdict)
-        
+
         # now replace all the {{ and }}
         msgbody = msgbody.replace('{{','{').replace('}}','}')
-        
+
         msg.add_alternative(msgbody, subtype='html')
 
         with open('/var/bluelabs/DispatchBuddy/images/magnify.gif', 'rb') as img:
@@ -216,12 +216,12 @@ class Gateway():
         related.attach(innerhtml)
         related.attach(icon_magnify_gif)
         '''
-        
+
         for h,v in urgheaders:
             msg[h]=v
-        
+
         bcc = [r.address for r in rx]
-        
+
         '''
             medias = []
             if self.mediatype == 'mms':
@@ -231,9 +231,9 @@ class Gateway():
                         if not media:
                             media = media_urls['UNKNOWN']
                         media = 'https://southmeriden-vfd.org/images/dispatchbuddy/'+media
-                
+
                 args['media_url'] = medias
-            
+
             print('args list: {}'.format(args))
         '''
 
@@ -249,7 +249,12 @@ class Gateway():
             s.starttls()
             s.ehlo(ehlo)
             s.login(user, pass_)
-            sresponse = s.sendmail(from_, bcc, msg.as_string(), keep_results=True)
+            # keep_results is my own patch to smtplib
+            try:
+                sresponse = s.sendmail(from_, bcc, msg.as_string(), mail_options=['SMTPUTF8'], keep_results=True)
+            except TypeError:
+                self.logger.critical('Need to patch smtplib for keep_results again; https://bugs.python.org/issue29539')
+                sresponse = s.sendmail(from_, bcc, msg.as_string(), mail_options=['SMTPUTF8'])
             qresponse = s.quit()
             self.logger.debug('server sresponse: {}'.format(sresponse))
             self.logger.debug('server qresponse: {}'.format(qresponse))
@@ -269,16 +274,19 @@ class Gateway():
         except Exception as e:
             self.logger.warning('Failed to send message to recipients: {}'.format(e))
             for r in bcc:
-                status_recorder(recipient=r, delivery_id=r.gateway, status='failed', reason=str(e), completed=True)
+                try:
+                    status_recorder(recipient=r, delivery_id='smtp failure', status='failed', reason=str(e), completed=True)
+                except Exception as ee:
+                    self.logger.warning('status recording error: {}'.format(ee))
 
 
     def deliver_twitter(self, id, rx, msgbody, status_recorder):
         ''' gateway gives us plenty of info, what we want out of it is:
               date_created, error_code, error_message, sid, status
-              
+
               we'll parse the error_code and error_message and return them in sendStatus
         '''
-        
+
         send_results = []
         twitter_app_key            = self.config.get('Twython', 'twitter_app_key')
         twitter_app_secret         = self.config.get('Twython', 'twitter_app_secret')
@@ -313,7 +321,7 @@ class Gateway():
 
         if medias:
             args['media_ids'] = set(medias)
-        
+
         try:
             response = twitter_client.update_status(**args)
             print('twitter response: {}'.format(response))
