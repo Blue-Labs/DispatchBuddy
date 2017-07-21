@@ -55,7 +55,7 @@ class Database:
         t_values = ','.join(['%%(%s)s' % x for x in keys])
         qstr     = 'INSERT INTO incidents ({}) VALUES ({})'.format(t_fields, t_values)
         self.logger.debug(qstr)
-        self._do_statement(qstr, ev, commit=True)
+        self._do_statement(qstr, ev)
 
     def add_event_hash(self, hash, ts):
         self._do_statement('INSERT INTO event_hashes (hash,ts) VALUES (%s,%s)', (hash,ts))
@@ -183,7 +183,7 @@ class Database:
                     break
                 except Exception as e:
                     # this is messy, needs to be done right
-                    self.logger.warning('{}'.format(e))
+                    self.logger.warning(' _notify_dispatchbudy_proc exception: {}'.format(e))
                     time.sleep(random.random()*5)
 
             for table in {'msgingprefs2015',}:
@@ -272,8 +272,8 @@ class Database:
             self.logger.critical('failed connect: {}'.format(e))
 
         if self.conn:
-            self.network.set()
             self.conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+            self.network.set()
             self.pending.set()
 
 
@@ -287,7 +287,7 @@ class Database:
         # put it on the queue and return promptly
         rv = None
 
-        while required:
+        while required: # returns on success
             try:
                 with self.conn.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor) as c:
                     c.execute(statement, args)
@@ -301,7 +301,13 @@ class Database:
                     return
 
             except Exception as e:
-                self.logger.warning('{}'.format(e))
+                # need better logic to decide if to reconnect or retry
+                # also, do we need to roll back?
+                self.logger.warning(' _do_statement exception: {} ({})'.format(e, e.__class__.__name__))
+                self.network.clear()
+                self.reconnect.set()
+
+                # put it on the stack and return
                 self.network.wait()
 
         self.pending_xact.put((statement, args, required, results, commit))
@@ -352,21 +358,28 @@ class Database:
                         self.conn.commit()
                     success = True
 
-                except (psycopg2.OperationalError, psycopg2.InterfaceError):
-                    logger.warning('reconnect needed, this should NOT have occurred')
+                except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                    logger.warning('reconnect needed, this should NOT have occurred; {} ({})'.format(e, e.__class__.__name__))
+                    # put back on the stack
+                    self.pending_xact.put((statement, args, required, results, commit))
+                    self.network.clear()
                     self.reconnect.set()
+                    self.network.wait()
 
                 except Exception as e:
                     logger.warning('op failed: {}, {}'.format(e, e.__class__.__name__))
                     self.conn.rollback()
                     self.pending_xact.put((statement, args, required, results, commit))
-                    self.pending.set()
                     time.sleep(1)
 
                 finally:
                     if not success:
                         self.pending_xact.put((statement, args, required, results, commit))
-                        self.pending.set()
+
+                        # let the reconnection trigger this cycle AFTER reconnect occurs
+                        if not self.reconnect.is_set():
+                            time.sleep(1)
+                            self.pending.set()
 
             if self._shutdown_queue.is_set() and self.pending_xact.empty():
                 self.pending.set()
