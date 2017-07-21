@@ -23,7 +23,7 @@ class Messaging(api.gateways.Gateway):
         self.evdict    = evdict
         self.xmd       = {} # dictionary of messages to be transmitted
         self.logger    = logging.getLogger('Messaging')
-    
+
 
     def _run(self):
         rx = self.select_recipient_list()
@@ -64,19 +64,22 @@ class Messaging(api.gateways.Gateway):
         now = datetime.datetime.now()
         dow = now.strftime('%a').lower()
         now = now.time().replace(second=0, microsecond=0)
-        
+
         # this should be thread locked
         while not self.db.recipient_list:
           self.logger.info('waiting for db to get RX list')
           time.sleep(1)
-        
-        
-        rx = [x for x in self.db.recipient_list if x.gateway   == self.gateway   \
-                                               and x.mediatype == self.mediatype \
-                                               and getattr(x, dow) == True       \
-                                               and x.dispatch == True            \
-                                               and not x.stop == True            \
-                                               and x.start_time <= now <= x.stop_time ]
+
+
+        try:
+            rx = [x for x in self.db.recipient_list if x.gateway   == self.gateway   \
+                                                   and x.mediatype == self.mediatype \
+                                                   and getattr(x, dow) == True       \
+                                                   and x.dispatch == True            \
+                                                   and not x.stop == True            \
+                                                   and x.start_time <= now <= x.stop_time ]
+        except Exception as e:
+            self.logger.warning('failed to create recipient list: {}'.format(e))
 
         # override RX list with only 'testing=True' recipients
         if os.getenv('TESTING'):
@@ -91,10 +94,10 @@ class Messaging(api.gateways.Gateway):
         # just hardcode formatter selection so i can get this out the door
 
         fm = getattr(api.formatters, self.mediatype.upper(), None)
-        
+
         if not fm:
             self.logger.warning('formatter for {} not found'.format(self.mediatype))
             return
-        
+
         fm = fm(self.mediatype)
         return fm.format(evdict)
