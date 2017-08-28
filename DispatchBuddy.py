@@ -35,22 +35,60 @@ if libpthread_path:
         threading.Thread.start = new_start
 
 
+import datetime
 import logging
 import logging.handlers
+
+logging.captureWarnings(True)
+
+class MsFormatter(logging.Formatter):
+    converter=datetime.datetime.fromtimestamp
+    def formatTime(self, record, datefmt=None):
+        ct = self.converter(record.created)
+        if datefmt:
+            s = ct.strftime(datefmt)
+        else:
+            t = ct.strftime('%Y-%m-%d %H:%M:%S')
+            s = '{}.{:03.0f}'.format(t, record.msecs)
+        return s
+    def format(self, record):
+        if record.levelno == logging.INFO:
+            record.msg = '\033[90m%s\033[0m' % record.msg
+        elif record.levelno == logging.WARNING:
+            record.msg = '\033[93m%s\033[0m' % record.msg
+        elif record.levelno == logging.ERROR:
+            record.msg = '\033[91m%s\033[0m' % record.msg
+        return logging.Formatter.format(self, record)
+
+fmt       = '[\x1b[1;30m%(asctime)s %(levelname)-.1s %(name)s\x1b[0m] ⨹ %(message)s'
+#datefmt   = '%Y-%m-%d %H:%M:%S.%f'
+#logging.basicConfig(format=fmt, datefmt=datefmt)
+logger    = logging.getLogger()
+formatter = MsFormatter(fmt=fmt)
+
+console = logging.StreamHandler()
+console.setFormatter(formatter)
+logger.addHandler(console)
+
 import configparser
 import prctl
 import sys
+import pwd
+import grp
 
 from api.dispatchbuddy import DispatchBuddy
+from imported_modules_tree import get_tree_representation_of_loaded_python_modules
 
+with open('/tmp/s.html', 'w') as f:
+    f.write(get_tree_representation_of_loaded_python_modules())
 
 def main():
-    logger   = logging.getLogger()
+
     configfile   = '/etc/dispatchbuddy/DispatchBuddy.conf'
     config       = configparser.ConfigParser()
 
     if not config.read(configfile):
-        logger.warning ('Error reading required configuration file: {}'.format(configfile))
+        print ('\x1b[1;31mError reading required configuration file\x1b[0m: {}'.format(configfile))
 
     if not 'main' in config.sections():
         config.add_section('main')
@@ -58,22 +96,19 @@ def main():
         config.add_section('main')
 
     if not 'log file' in config['Logging']:
-        config.set('main','log file','/var/log/dispatchbuddy')
+        config.set('Logging','log file','/var/log/dispatchbuddy')
     if not 'log level' in config['Logging']:
-        config.set('main','log level','info')
-    if not 'log console' in config['Logging']:
-        config.set('main','log console','yes')
+        config.set('Logging','log level','info')
 
     logfile       = config.get('Logging', 'log file')
     loglevel      = config.get('Logging', 'log level')
-    numeric_level = getattr(logging, loglevel.upper(), None)
 
-    if not isinstance(numeric_level, int):
-        print ('Invalid log level: {}'.format(loglevel))
-        logger.setLevel(loglevel)
+    # set the root logger level
+    logger    = logging.getLogger()
+    logger.setLevel(loglevel.upper())
 
-    logger.setLevel(numeric_level)
-    formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-.1s %(name)s ⨹ %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    # switch to a named logger
+    logger    = logging.getLogger('DispatchBuddy')
 
     try:
         handler   = logging.handlers.TimedRotatingFileHandler(logfile, when='midnight', backupCount=14, encoding='utf-8')
@@ -81,19 +116,36 @@ def main():
         logger.addHandler(handler)
     except:
         logger.warn('failed to open logfile, output to console only')
-        config.set('Logging','log console','True')
 
-    if config.get('Logging','log console'):
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.WARNING)
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
+    try:
+        loglevel = config.get('Logging','console log level')
+    except:
+        loglevel = 'WARNING'
+    console.setLevel(loglevel.upper())
 
     # for k,v in config, remove comments: asdf = 234 # comment
     # k=asdf
     # v=234 # comment
 
     logger.info('DispatchBuddy v{}'.format(__version__))
+
+    if not 'run as user' in config['main']:
+        logger.warning('no "run as user" setting in [main]')
+        for id in (pwd.getpwuid(os.getuid()).pw_name, 'root','dispatchbuddy'):
+            try:
+                run_as_user = pwd.getpwnam(id).pw_name
+            except:
+                pass
+        config.set('main','run as user',run_as_user)
+
+    if not 'run as group' in config['main']:
+        logger.warning('no "run as group" setting in [main]')
+        for id in (grp.getgrgid(os.getgid()).gr_name, 'root','dispatchbuddy'):
+            try:
+                run_as_group = grp.getgrnam(id).gr_name
+            except:
+                pass
+        config.set('main','run as group',run_as_group)
 
     # make sure there's a dispatchbuddy cgroup
     # and make sure our pid is slotted into it
