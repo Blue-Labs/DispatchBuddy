@@ -11,7 +11,7 @@ import time
 import api.formatters
 import api.gateways
 
-logging.basicConfig(level=logging.DEBUG)
+# when testing; logging.basicConfig(level=logging.DEBUG)
 
 class Messaging(api.gateways.Gateway):
     def __init__(self, db, config, gateway, mediatype, id, evdict):
@@ -22,7 +22,7 @@ class Messaging(api.gateways.Gateway):
         self.id        = id
         self.evdict    = evdict
         self.xmd       = {} # dictionary of messages to be transmitted
-        self.logger    = logging.getLogger('Messaging')
+        self.logger    = logging.getLogger('bluelabs.dispatchbuddy.messaging')
 
 
     def _run(self):
