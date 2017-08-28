@@ -215,8 +215,9 @@ class PCLParser():
 
     def __init__(self, logger=None, id=None):
         if not logger:
+            print('instantiating our OWN LOGGER')
             logging.basicConfig()
-            logger = logging.getLogger()
+            logger = logging.getLogger('bluelabs.dispatchbuddy.parsers.pjl_lexmark')
             logger.setLevel(logging.DEBUG)
         self.logger   = logger
         self.id       = id
@@ -1151,22 +1152,29 @@ class Matrix():
 
 
     def post_filters(self):
-        ev = self.ev
         # convert to ISO 8601 date time format, then make it easy to read
-        x           = parser.parse (ev.date + 'T' + ev.time_out + time.strftime('%z'))
+        x           = parser.parse (self.ev.date + 'T' + self.ev.time_out + time.strftime('%z'))
         self.ev_update('isotimestamp', str(x))
         self.ev_update('date_time', x.strftime('%b%d, ')+x.strftime('%l:%M%P').strip())
 
         # add inhouse generated data
-        if ev.address:
+        if self.ev.address:
+            address = self.ev.address
             # make the address more readable
-            self.ev_update('address', ev.address.title())
+            address = re.sub('(\sSM(?:/|$))', '', address)
 
-            daddr = ev.address.replace(' ', ',')
+            if '/' in address:
+                address = re.sub('//', '/', address)
+                m = address.split('/', 1)
+                address = m[0] + ' & ' + m[1]
+
+            self.ev_update('address', address.title())
+
+            daddr = address.replace(' ', ',')
             self.ev_update('gmapurl', 'https://www.google.com/maps/place/{daddr},+Meriden,+CT+06451'.format(daddr=daddr))
 
             saddr = 'South+Meriden+Volunteer+Fire+Department,+31,+Camp,+Street,+Meriden,+CT+06451'
-            self.ev_update('gmapurldir', 'https://www.google.com/maps/dir/{saddr}/{daddr},+Meriden,+CT+06451'.format(daddr=daddr,saddr=saddr))
+            self.ev_update('gmapurldir', 'https://www.google.com/maps/dir/{saddr}/{daddr},+Meriden,+CT+06451/data=!4m2!4m1!3e0!5m1!1e1'.format(daddr=daddr,saddr=saddr))
 
 
     def parse_matrix(self, matrix):
