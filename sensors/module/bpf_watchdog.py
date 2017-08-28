@@ -23,7 +23,7 @@ def startup(config, eventmanager):
     logger = logging.getLogger(__name)
 
     threads = []
-    
+
     if not __name in config:
         logger.info('no configuration section for {}'.format(__name))
         return None
@@ -78,7 +78,7 @@ class Watchdog(object):
 
         self.status    = 'OK'
         self.status_ts = self.lastevent
-        
+
         self.period = self.warning / 1.1 # sleep for 90% of warning period. this way we should always get at
                                          # least one packet read attempt before $warning
 
@@ -131,7 +131,7 @@ class Watchdog(object):
                 self.warn('some bad foo, restarting watchdog: {}'.format(v))
                 self.online = False
                 time.sleep(10)
-            
+
             now = datetime.datetime.utcnow()
 
             # timeout expired
@@ -149,7 +149,7 @@ class Watchdog(object):
                         logger.warn('watchdog hit warning age')
                         self.status    = 'WARNING'
                         self.status_ts = now
-                
+
                 else:
                     # timeout expired without reading a packet
                     pass
@@ -171,10 +171,10 @@ class Watchdog(object):
                 #        break
                 #    print('pip')
                 self.lastevent = now
-            
+
             else:
                 logger.warn('unexpected value: {}'.format(rval))
-            
+
             # yield
             waketime = now + self.period
             #logger.debug('sleeping about {} seconds'.format(int((waketime-now).total_seconds())))

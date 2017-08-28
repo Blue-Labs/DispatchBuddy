@@ -342,7 +342,7 @@ class _tcpflags(object):
         prettybool={False:'◻', True:'\x1b[1;32m◼\x1b[0m'}
         if k and k[0] == '__dict__':
             #return object.__getattribute__(self, '__dict__')
-        
+
             #print('d>> {}'.format(object.__getattribute__(self, '__dict__').items()))
             rv = { _k:prettybool[_v] for _k,_v in object.__getattribute__(self,*k).items() if not _k.startswith('_')}
             return rv
@@ -412,7 +412,7 @@ class _TCP(object):
         _d = { x:getattr(self, x) for x in dir(self) if not x[0] == x[1] == '_' }
         for k,v in _d:
             yield k,v
-    
+
     def __getattribute__(self, *k):
         #print('_TCP __getattribute__ {}'.format(k))
         v = object.__getattribute__(self, *k)
@@ -423,7 +423,7 @@ class _TCP(object):
         if k == 'checksum':
             v = '{:#06x}'.format(v)
         return v
-    
+
     def __str__(self):
         _d = [ '{}:{}'.format(x,getattr(self, x)) for x in dir(self) if not x[0] == x[1] == '_' ]
         _d = 'TCP<{  '+',\n  '.join(_d)+'}>'
@@ -438,7 +438,7 @@ class _TCP(object):
 class _Packet(object):
     '''Try to resemble record format seen when using Wireshark
     '''
-    
+
     def __init__(self):
         #print('>> _Packet.__init__')
         self.ethernet = _Ethernet()
@@ -451,14 +451,14 @@ class _Packet(object):
     def __setstate__(self, state):
         #print('_Packet.__setstate__')
         self.__dict__.update(state)
-    
+
     # do some magic here so we can programatically add the tcp or udp class without
     # manually doing so
     def __setattr__(self, key, value):
         #if isinstance(getattr(self, key), 'type')
-        
+
         object.__setattr__(self, key, value)
-        
+
         #self.__dict__[key] = value
         #print('_Packet.__setattr__:k={} v={}, vcm:{}'.format(key,value,value.__class__.__module__))
 
@@ -483,7 +483,7 @@ class _Packet(object):
         _d = { x:getattr(self, x) for x in dir(self) if not x[0] == x[1] == '_' }
         for k,v in _d:
             yield k,v
-    
+
     def __str__(self):
         _d = [ '{}:{}'.format(x,getattr(self, x)) for x in dir(self) if not x[0] == x[1] == '_' ]
         _d = 'Packet<{'+', '.join(_d)+'}>'
@@ -504,7 +504,7 @@ class Packet(object):
     returns:
         Packet object
     '''
-    
+
     def __init__(self, pktlen=0, packet=None):
         #print('>> Packet.__init__')
         self.P = _Packet()
@@ -527,12 +527,12 @@ class Packet(object):
                 outdick[e] = '\\x1b[1;31m'+str(outdick[e])+ '\\x1b[0m'
 
         yield 'Ethernet', outdick
-        
+
         outdick = {'version':P.ip.version, 'header_length':P.ip.header_length, 'DS':P.ip.ds,
                      'total_length':P.ip.total_length, 'id':P.ip.id, 'flags':P.ip.flags,
                      'ttl':P.ip.ttl, 'fragment_offset':P.ip.fragment_offset, 'protocol':P.ip.protocol,
                      'checksum':P.ip.checksum, 'src':P.ip.src, 'dst':P.ip.dst}
-        
+
         for e in outdick:
             if 'IP.'+e in highlight:
                 outdick[e] = '\x1b[1;31m'+str(outdick[e])+'\x1b[0m'
@@ -571,7 +571,7 @@ class Packet(object):
         else:
             return object.__getattribute__(self, attr)
 
-    
+
     def __setattr__(self, k, v):
         self.__dict__[k]=v
 
@@ -587,7 +587,7 @@ class Packet(object):
             return str(self.P)
         except Exception as e:
             return "<Packet(Exception:{})>".format(e)
-        
+
 
     def __repr__(self):
         return repr(self.P)
@@ -600,7 +600,7 @@ class Packet(object):
         P = self.P
         P.pktlen = pktlen
         P.packet = packet
-        
+
         if not packet:
             # injected packet to accomodate gaps, set (almost) all null
             # need to be a bit more smart about things and have someone prefill this stuff?
@@ -610,7 +610,7 @@ class Packet(object):
                  0,0,'tcp',0,'\0\0\0\0','\0\0\0\0')
             P.tcp(0,0,0,0,20,0,0,0,0,[])
             return
-        
+
         # some (older?) versions of libpcap pad packets at the end. to ensure we get the right
         # count of things, we'll attempt to identify and discard those bytes
         P.accumulated_length = 0
@@ -641,7 +641,7 @@ class Packet(object):
             P.vlans.insert(0, vlan)
 
             packet = packet[4:]
-        
+
         # we ONLY decode IP packets
         frame_type = struct.unpack('!H', packet[:2])[0] & 0xffff
         if not frame_type == 0x0800:
@@ -658,7 +658,7 @@ class Packet(object):
         header_length   = (ord(ihl) & 0xf) *4
         tos             = ord(tos)
         ds              = {'dscp':tos & 0xfc >> 2, 'ecn_ct':tos & 0x02 >> 1 == 1, 'ecn_ce':tos & 0x01 == 1 }
-        
+
         flags           = {'reserved':fragment_offset>>15,'dont_fragment':(fragment_offset & 0x4000) >> 14 == 1, 'more_fragments':(fragment_offset & 0x2000) >> 13 == 1 }
 
         fragment_offset = fragment_offset & 0x0fff
@@ -684,7 +684,7 @@ class Packet(object):
             # minimum TCP header size is 20, if hlen is > 20, the rest of it is options
             optionbuf = packet[:header_length-20]
             packet    = packet[header_length-20:]
-            
+
             options = []
             breaktries=50
             if optionbuf:
@@ -720,7 +720,7 @@ class Packet(object):
             else:
                 P.payload = b''
         except Exception as e:
-            logging.getLogger().warn('failed to fully dissect packet: {}'.format(e))
+            logging.getLogger('bluelabs.dispatchbuddy.sensors.module.packet_dissector').warn('failed to fully dissect packet: {}'.format(e))
 
 
 if __name__ == '__main__':
@@ -741,11 +741,11 @@ if __name__ == '__main__':
     if handle.open_offline(sys.argv[1]):
         print('failed to open file: {}'.format(sys.argv[1]))
         sys.exit()
-    
+
     while True:
         (rval, pktlen, caplen, timestamp, packet) = handle.next_ex()
         print('pktlen: {}, caplen: {}, len {}'.format(pktlen,caplen,len(packet)))
-    
+
         P = Packet(pktlen, packet)
         if P.ethernet.type == 0x0800 and P.ip.protocol == 'tcp':
             for k,v in P.items():
