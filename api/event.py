@@ -53,13 +53,14 @@ class EventManager:
 
         try:
             self.worker = dispatch_job #DispatchBuddyTask()
-            '''
-            self.worker.app.conf.update(celery_config)
-            self.worker.ignore_result = False
+            #'''
+            #self.worker.app.conf.update(celery_config)
+            #self.worker.ignore_result = False
 
             print('worker.app.conf')
             for k,v in sorted(self.worker.app.conf.items()):
                 print('   {:<40} {}'.format(k,v))
+            '''
             print('worker')
             for k in sorted([k for k in dir(self.worker) if not k.startswith('_')]):
                 if k == 'from_config':
@@ -73,17 +74,17 @@ class EventManager:
 
         except Exception as e:
             traceback.print_exc()
-        
+
         logger.info('Starting Event Manager thread')
 
-    
+
         # set up a thread event button
         self.pending   = threading.Event()
         self._shutdown = threading.Event()
-        
+
         em = threading.Thread(target=self.scan_evg_queue, name="Event Manager")
         em.start()
-        
+
         self.threads.append(em)
 
         #self.load_evg_state()
@@ -123,7 +124,7 @@ class EventManager:
             except RuntimeError:
                 self.logger.warning('event in {} is still locked, ignoring'.format(evgtype))
 
-    
+
     def new(self, ev_type):
         if not ev_type in self.eventgroups:
             eg = EventGroup(ev_type)
@@ -132,19 +133,19 @@ class EventManager:
             eg = self.eventgroups[ev_type]
         return eg
 
-    
+
     #@profile
     def scan_evg_queue(self):
         holdoff = 10.0
         expected = 0
         config = self.config
-        
+
         # this should get its own config section?
         section       = config['module.bpf_payload_event.dispatches']
         intra_stall   = int(section.get('intra-stall timeout').split('#')[0].strip())
         overall_stall = int(section.get('overall-stall timeout').split('#')[0].strip())
         abort         = int(section.get('abort timeout').split('#')[0].strip())
-        
+
         while True:
             #objgraph.show_refs([self.eventgroups], filename='/tmp/eventgroups.png')
 
@@ -154,7 +155,7 @@ class EventManager:
                     self.pending.clear()
             except Exception as e:
                 self.logger.critical('pending error: {}'.format(e))
-            
+
             if self._shutdown.is_set(): # leave unfinished tasks in the queue? eep. we will lose them :)
                 # uh oh, let's serialize this and pick up where we left off?
                 self.logger.debug('shutdown seen, saving evg state')
@@ -169,7 +170,7 @@ class EventManager:
                 return
 
             now             = datetime.datetime.utcnow()
-            
+
             for evgtype in self.eventgroups:
                 if not len(self.eventgroups[evgtype]):
                     continue
@@ -182,18 +183,18 @@ class EventManager:
                         # store a copy of it inside here in case celery task breaks
                         with open('/var/db/DispatchBuddy/evdata/event-{}.evdata'.format(event.uuid), 'wb') as f:
                             f.write(event.payload)
-                    
+
                         # this is NOT the place to do event specific decoding, what we
                         # are doing here is converting it to base64
                         payload       = base64.b64encode(event.payload).decode()
                         self.logger.info('{} payload raw {:,}b, encoded to b64 {:,}b'.format(event.uuid, len(event.payload), len(payload)))
-                        
+
                         # this will deadlock on .locked() easily, we need a better way of reading all
                         # items in the queue without chance of deadlocking
                         #self.save_evg_state()
 
                         event.celery_task = self.worker.apply_async((event.uuid, payload), task_id=event.uuid)
-                        #print('task: {}'.format(dir(event.celery_task))) 
+                        #print('task: {}'.format(dir(event.celery_task)))
                         #for k in sorted([k for k in dir(event.celery_task) if not k.startswith('_')]):
                         #        try:
                         #            v = getattr(event.celery_task, k)
@@ -218,11 +219,11 @@ class EventManager:
                         if abort_t < now:  # we deal with slow packets but have a hard deadline from start of
                             c = len(event.collection)# the conversation
                             self.logger.warning('{} forcing dispatch of slow or stalled event with {} packets'.format(event.uuid, c))
-                        
+
                             # try to decode it anyway, our next pass into the queue scanner will pop its cherry
                             event.full = True
                             event.stall_forced = True
-                            
+
                             # this should really call a callback like event.sort_payload() which does this
                             # EVQ should be agnostic about event data types
                             event.sort()
@@ -230,14 +231,14 @@ class EventManager:
                         elif overall_stall_t < now:    # if our original flow ts is really old...
                             if intra_stall_t < now: # if we haven't gotten another packet in a while...
                                 self.logger.warning('{} is stalled'.format(event.uuid))
-                    
+
                     #if event.celery_task:
                     #    self.logger.info('celery status: {}'.format(event.celery_task.state))
 
             # check for items that can be removed from the queue
             dels = []
             pending = 0
-            
+
             for evgtype in self.eventgroups:
                 if not len(self.eventgroups[evgtype]):
                     self.logger.debug('skipping EVG {}'.format(evgtype))
@@ -276,7 +277,7 @@ class EventManager:
             # if any events remain in our queue, set our rescan holdoff to 10 seconds, otherwise None
             holdoff = (pending or expected) and 10.0 or None
             self.logger.info('holdoff set to {}'.format(holdoff))
-        
+
 
 class _Event(object):
     def __new__(cls):
@@ -334,7 +335,7 @@ Last event TS: {lastevent_ts}
   Celery Task: {celery_task}
        Source: {src_initial_id}
   Destination: {dst_initial_id}
-  
+
 '''.format(**self.__dict__)
 
         for k in ('identifier','tcp_phase','type','stall_forced','stall_death','raw_collection','damaged','dupes',):
@@ -346,7 +347,7 @@ Last event TS: {lastevent_ts}
 
 
         return _str
-    
+
     def items(self):
         # always return the packets in sorted order (these are sorted by sequence number)
         #srcseq = [e.tcp.sequence_number for tid,e in self.collection if e.ip.src == self.lhs ]
@@ -356,7 +357,7 @@ Last event TS: {lastevent_ts}
         #for c in sorted(self.collection.items(), key=itertools.itemgetter('tcp.sequence_number')):
         #    yield c
         pass
-    
+
     def sort(self):
         # sort our payload
         event_tcp_packet_sort(self)
@@ -401,9 +402,9 @@ class EventGroup(object):
 
     def __str__(self):
         _str = 'EventGroup: {}, event items:{}\n'.format(self.event_group_type, len(self.events))
-        
+
         return _str
-    
+
     def __getitem__(self, k):
         return self.events[k]
 
