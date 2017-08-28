@@ -20,7 +20,7 @@ class TCP_PHASE(Enum):
 
     def __str__(self):
         return self.name
-    
+
     def __int__(self):
         return self.value
 
@@ -61,11 +61,10 @@ def startup(config, eventmanager):
     # establish our configuration and start running. our parent is pretty clueless about us,
     # we need to do all the knob twisting here and report back to our parent
     __name = __name__[8:]
-
     logger = logging.getLogger(__name)
 
     threads = []
-    
+
     if not __name in config:
         logger.info('no configuration section for {}'.format(__name))
         return None
@@ -94,7 +93,7 @@ def startup(config, eventmanager):
         th.start()
         threads.append({th:p})
         logger.info('{} handler started, tid: {}'.format(__w, th.ident))
-        
+
 
     return threads
 
@@ -105,12 +104,13 @@ class EventHandler(object):
         self.lastevent     = None           # updated everytime a packet is seen matching the filter
         self.online        = False          # set True when bpf program is attached and running
         self.status        = 'OK'
+        self.config        = config
 
         #self.handle        = pcap.pcapObject()
         self.handle        = None
         self.lastevent     = datetime.datetime.utcnow()
         self._shutdown     = threading.Event()
-        
+
         self.eventmanager  = eventmanager
 
         # get the eventgroup for packets
@@ -122,6 +122,7 @@ class EventHandler(object):
                 k = attr.replace(' ','_')
                 setattr(self, k, v)
             except:
+                logger.info('attribute not found in [{}] {}'.format(__name__, attr))
                 setattr(self, k, None)
                 if attr in ['interface','bpf']:
                     logger.warn('config verb {} is required for {}'.format(attr,_name))
@@ -138,15 +139,30 @@ class EventHandler(object):
         if self.handle:
             self.handle = None
 
+        # create a dummy network interface for testing
+        # modprobe dummy
+        # ip link set name test0 dev dummy0
+        # ip addr add 192.168.90.91/24 dev test0
+        # ip link set test0 up
+        # ip link delete test0 type dummy
+        # rmmod dummy
+
         try:
             # make sure reorder_hdr flag is set off vlan200, if not, we'll lose almost 1/2 of our packets
             # ~$ cat /proc/net/vlan/vlan200
             #  vlan200  VID: 200        REORDER_HDR: 0  dev->priv_flags: 4001
             #           total frames received        28202
             # [...]
-            
-            subprocess.call(['/usr/bin/vconfig','set_flag','vlan200','1','0'])
-        
+            try:
+                prestart = self.config.get('pre-start command').split(' ')
+                out = subprocess.run(prestart, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if 1 or not out.returncode == 0:
+                    logger.warning('"{}"'.format(' '.join(prestart)))
+                    logger.warning('pre-start command had non-zero exit code: {}'.format(out.returncode))
+                    logger.warning('  {}'.format(out.stderr.decode().strip()))
+            except Exception as e:
+                logger.warning('pre-start command failed: {}'.format(e))
+
             self.handle = pcapy.open_live(self.interface, 3076, 1, 1000) # 3K buffer, 1000ms timeout, ignored
 
             '''
@@ -170,17 +186,17 @@ class EventHandler(object):
 
     def run(self):
         logger   = self.logger
-        
+
         '''
         # wtf. python's built in os.sched_setscheduler() just does not do SCHED_FIFO any more. even
         # with caps set, it still returns EPERM
-        
+
         # turns out systemd's logind puts ssh users into a cgroup that can't do RT.
         # move your shell to the default cpu group with:
         #    cgclassify -g cpu:/ $$
         # then you can do things like the following.
-        
-        
+
+
         # do it with C instead
         c = ctypes.cdll.LoadLibrary('libc.so.6')
         SCHED_FIFO = 1
@@ -203,19 +219,19 @@ class EventHandler(object):
             logger.critical('prctl.capbset.net_raw   ={}'.format(prctl.capbset.net_raw))
             logger.critical('[1;31mPermission denied[0m. Does the python binary have cap_net_raw,cap_sys_nice,cap_net_admin=eip? or do you need to run this? cgclassify -g cpu:/ $$')
             quit
-        
+
         #os.setpriority(os.PRIO_PROCESS, 0, -20)
         in_process = False
         session_stats=(0,0,0)
-        
+
         #print('attach debugger within 30 seconds now')
         #time.sleep(30)
-        
+
         while not self._shutdown.is_set():
             if not (self.online and self.handle):
                 self.start_handle()
                 continue
-            
+
             try:
                 rval = self.handle.next()
                 if rval:
@@ -242,7 +258,7 @@ class EventHandler(object):
                 #self.events_scan()
 
                 continue
-            
+
             if not rval == 1:
                 logger.critical('unexpected rval: {}'.format(rval))
 
@@ -299,7 +315,7 @@ class EventHandler(object):
         damaged = False
         logger  = self.logger
         P       = packet_dissector.Packet(snaplen, packet)
-        
+
         if False:
             for k,v in P.items(highlight=['IP.id','TCP.SEQ#']):
                 if isinstance(v, dict):
@@ -312,7 +328,7 @@ class EventHandler(object):
         id = (P.ip.src,P.tcp.sport),(P.ip.dst,P.tcp.dport)
         if id in self.eventgroup:
             ev = self.eventgroup.get(id)
-            
+
             # if reawakening a dead conversation, cleanse the filth
             if ev.stall_forced:
                 ev.full         = False
@@ -320,7 +336,7 @@ class EventHandler(object):
                 ev.stall_death  = None
                 ev.origin_ts    = datetime.datetime.utcnow()
                 ev.lastevent_ts = ev.origin_ts
-            
+
             # verbosity
             if True:
                 logger.debug('{:>3} {}:{} ─▶ {}:{}, id:0x{:04x} {}'.format(
@@ -337,7 +353,7 @@ class EventHandler(object):
             if al < P.ip.total_length:
                 logger.warning('packet should be {} bytes, it is actually {} bytes'.format(P.ip.total_length, al))
                 damaged = True
-            
+
             # check if it's a duplicate packet that we already received using the IP id and TCP seq#/ack#
             dupes = [_p for unit_id,_p in ev.collection
                     if _p.ip.src == P.ip.src
@@ -350,7 +366,7 @@ class EventHandler(object):
                 _p = dupes[0] # just show the first instance of all dupes
                 logger.debug('   └──▶ duplicate') # of IP/id:0x{:04x} T/seq:0x{:08x} T/ack:0x{:08x}'.format(len(ev.collection), _p.ip.id, _p.tcp.sequence_number, _p.tcp.acknowledgement_number))
                 dupe = True
-            
+
             # set the dst initial id?
             if ev.valid_startup is None and P.ip.dst == self.source and P.tcp.flags.SYN and P.tcp.flags.ACK:
                 ev.dst_initial_id = P.tcp.sequence_number
@@ -359,7 +375,7 @@ class EventHandler(object):
             ev = self.eventgroup.new(id, self.source)
             # we set the rhs upon receipt of syn
             ev.src_initial_id = P.tcp.sequence_number
-        
+
         self.write_pcap_file('/var/db/DispatchBuddy/pcap/{}.pcap'.format(ev.uuid), packet, snaplen, timestamp)
 
         # IP sequences perfectly for retransmits.
@@ -412,7 +428,7 @@ class EventHandler(object):
                 # is this the last possible packet?
                 if prev_phase == TCP_PHASE.TIME_WAIT and ev.tcp_phase == False:
                     ev.purgeable = True
-                
+
                 if ev.tcp_phase in (TCP_PHASE.CLOSING, TCP_PHASE.TIME_WAIT, False):
                     logger.debug('    wake up EVM')
                     if not self.eventmanager.pending.is_set():
@@ -425,12 +441,12 @@ class EventHandler(object):
                 # bear in mind that this is an active close. we may
                 # encounter a passive close after first FIN. we can
                 # then consider the connection closed after 2*MSL
-                # MSL, maximum segment lifetime, is two minutes. 
+                # MSL, maximum segment lifetime, is two minutes.
                 # therefore, 4 minutes.
-                
+
                 # wrt. DispatchBuddy, we don't at all care if the local socket remains 1/2
                 # dead for 2MSL, we trigger EVM as soon as we enter a closing phase
-                
+
                 logger.debug('packet collection finished, reconstructing')
                 event_tcp_packet_sort(ev) # sorts packets and extracts payload
                 ev.full = True
