@@ -263,10 +263,12 @@ class Database:
         self.network.clear()
         if self.conn:
             self.conn.close()
+            self.conn = None
 
         dburi = self.config.get('Database', 'db uri')
 
         try:
+            self.logger.info('_connect()')
             self.conn = psycopg2.connect(dburi)
         except Exception as e: # all errors will be fatal
             self.logger.critical('failed connect: {}'.format(e))
@@ -315,7 +317,7 @@ class Database:
 
 
     def _push_queue(self):
-        logger = logging.getLogger()
+        logger = logging.getLogger(__name__)
         while True:
             self.pending.wait()
             self.pending.clear()
