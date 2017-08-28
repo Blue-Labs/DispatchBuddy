@@ -71,7 +71,7 @@ class Formatter():
           }
 
           table.event {
-             word-break:break-word;
+             word-break:break-all;
              border-collapse:collapse;
              border:none;
              margin-right:0;
