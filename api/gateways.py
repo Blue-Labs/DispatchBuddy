@@ -16,7 +16,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
 # put these into the configfile
-from twilio.rest import TwilioRestClient
+from twilio.rest import Client
 from twython import Twython
 
 logging.basicConfig(level=logging.DEBUG)
@@ -37,7 +37,7 @@ media_urls = {
     '^MV ACCIDENT INVOLVING BUILDING' :'MV_ACCIDENT_INVOLVING_BUILDING.png',
     '^MV ACCID '                      :'AUTO_ACCID.png',
     '^MVA WITH HAZMAT '               :'',
-    '^ODOR OF SMOKE'                  :'',
+    '^ODOR OF SMOKE'                  :'ODOR_OF_SMOKE.png',
     '^SPEC RESPONSE CODE GREEN'       :'',
     '^WIRES DOWN'                     :'WIRES_DOWN.png',
     '^RESCUE EMS'                     :'RESCUE_EMS.png',
@@ -47,7 +47,7 @@ media_urls = {
     'ANIMAL BITE'                     :'ANIMAL_BITE.png',
     'INJURIES'                        :'INJURY.png',
     'WITH INJURY'                     :'INJURY.png',
-    #'UNKNOWN'                         :'UNKNOWN.png',
+    'UNKNOWN'                         :'UNKNOWN.png',
     '^AUTO ACCID .* HAZARD'           :'ROAD_HAZARD.png',
     'MOTORCYCLE'                      :'MOTORCYCLE.png',
 }
@@ -62,7 +62,7 @@ media_urls = {
 
 class Gateway():
     def __init__(self):
-        self.logger = logging.getLogger('Gateway')
+        self.logger = logging.getLogger('bluelabs.dispatchbuddy.gateway')
 
     def deliver(self, id, rx, msgbody, status_recorder):
         ''' send to a single recipient
@@ -93,7 +93,7 @@ class Gateway():
         twilio_account_sid           = self.config.get('Twilio', 'twilio_account_sid')
         twilio_auth_token            = self.config.get('Twilio', 'twilio_auth_token')
         twilio_from                  = self.config.get('Twilio', 'twilio_from')
-        twilio_client                = TwilioRestClient(twilio_account_sid, twilio_auth_token)
+        twilio_client                = Client(twilio_account_sid, twilio_auth_token)
 
         args = {'body':msgbody, 'messaging_service_sid':twilio_messaging_service_sid}
         medias = []
@@ -136,10 +136,13 @@ class Gateway():
                 else:
                     reason = '{}: {}'.format(message.error_code, message.error_message)
                     status_recorder(recipient=message.to, delivery_id=message.sid, status='failed', reason=reason, completed=True)
-                    self.logger.warning('twilio bad sending response: {}'.format(message))
+                    self.logger.critical('twilio bad sending response: {}'.format(message))
             except Exception as e:
-                self.logger.warning('Twilio got grumpy sending to {}@{}: {}'.format(addr, self.gateway, e))
-                status_recorder(recipient=message.to, delivery_id=message.sid, delivery_ts=message.date_created, status='failed', reason=str(e), completed=True)
+                self.logger.critical('Twilio got grumpy sending to {}@{}: {}'.format(addr, self.gateway, e))
+                try:
+                    status_recorder(recipient=message.to, delivery_id=message.sid, delivery_ts=message.date_created, status='failed', reason=str(e), completed=True)
+                except Exception as e:
+                    self.logger.critical('double failure, no "message" probably: {}'.format(e))
 
 
     def deliver_email(self, id, rx, msgbody, status_recorder):
