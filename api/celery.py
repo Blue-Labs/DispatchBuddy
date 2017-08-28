@@ -10,6 +10,7 @@ import psycopg2
 import os
 import configparser
 import requests
+import logging
 
 from celery import Celery, Task, group, chord, chain
 from celery.result import GroupResult
@@ -28,6 +29,7 @@ sys.path.append('/var/bluelabs/DispatchBuddy')
 app = Celery('tasks')
 
 celery_config = dict(
+    CELERYD_HIJACK_ROOT_LOGGER         = False,
     CELERY_TASK_SERIALIZER             = 'json',
     CELERY_ACCEPT_CONTENT              = ['json'],  # Ignore other content
     CELERY_TIMEZONE                    = 'America/New_York',
@@ -45,32 +47,36 @@ celery_config = dict(
     CELERYD_STATE_DB                   = '/var/db/DispatchBuddy/celeryd.state',
 
     CELERYD_TIMER_PRECISION            = 0.1,
-    BROKER_URL                         = 'amqp://127.0.0.1',
+    #BROKER_URL                         = 'amqp://127.0.0.1',
     BROKER_CONNECTION_TIMEOUT          = 0.5, # doesn't seem to help at all
     #BROKER_HEARTBEAT                  = 30,
     #BROKER_HEARTBEAT_CHECKRATE        = 1,
-    BROKER_POOL_LIMIT                  = 4
+    BROKER_POOL_LIMIT                  = 4,
 )
 
-app.conf.update(celery_config)
-
 logger = get_task_logger(__name__)
-
-if os.getenv('TESTING') is not None:
-    logger.info('TESTING is set')
-    print('TESTING is set')
-
-def flushall():
-    sys.stdout.flush()
-
-app.loader.on_worker_shutdown = flushall
 
 
 # these instructions are ONLY performed in MainProcess, child forks must init their own DB instance in @worker_process_init
 configfile   = '/etc/dispatchbuddy/DispatchBuddy.conf'
 config       = configparser.ConfigParser()
+
 if not config.read(configfile):
     logger.warning ('Error reading required configuration file: {}'.format(configfile))
+
+logger.setLevel(getattr(logging, config.get('Logging', 'log level').upper(), 'WARNING'))
+
+celery_config['BROKER_URL'] = config.get('Celery', 'broker url')
+
+if os.getenv('TESTING') is not None:
+    logger.warning('TESTING is set')
+
+def flushall():
+    sys.stdout.flush()
+
+app.conf.update(celery_config)
+app.loader.on_worker_shutdown = flushall
+
 
 #print(dir(app.loader))
 #sys.stdout.flush()
@@ -296,6 +302,7 @@ def db_print_remote(res, id):
 
 
 if __name__ == '__main__':
+    logger.error('starting as __main__')
     app.start()
     logger.error('app aroo!')
     DB.shutdown()
