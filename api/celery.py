@@ -1,3 +1,12 @@
+"""
+this is the application head. as celery loads and runs it, it will create
+a worker queue submissive to app() which is created by instantiating
+Celery('tasks'). each function decorated as @app.task is visible to the
+task process. only simple objects can be shared from app() to a Task.
+complex variables such as network connections must never be shared.
+"""
+
+
 import base64
 import sys
 import time
@@ -77,6 +86,7 @@ def flushall():
 app.conf.update(celery_config)
 app.loader.on_worker_shutdown = flushall
 
+appDB = Database(config, app=True)
 
 #print(dir(app.loader))
 #sys.stdout.flush()
@@ -91,15 +101,22 @@ def start_worker_init_db(**kwargs):
 
 
 @worker_process_init.connect()
-def start_process_init_db(**kwargs):
+def start_process_init_db(*args, **kwargs):
+    # this is global to the @app.task, NOT celery.py:app(). each task needs its own
+    # DB instance so we don't have conflicting network connections. each task is a
+    # separate Linux process. simple variables can be shared via app(), those such as
+    # network connections, must never be shared
     global DB
-    logger.info('\x1b[1;34mprocess_init({}) {!r}\x1b[0m'.format(os.getpid(), kwargs))
     DB = Database(config)
+    logger.info('starting worker process, DB is {}, DB.conn is {}'.format(DB, DB.conn))
+    logger.info('\x1b[1;34mprocess_init({}, {}) {!r}\x1b[0m'.format(os.getpid(), args, kwargs))
 
 
 # shutdown the MainProcess DB (note; you won't see logging information from DB here.)
 @worker_shutdown.connect()
 def main_worker_shutdown(**kwargs):
+    logger.info('main_worker_shutdown()')
+    """
     try:
         for name, task in app.tasks.items():
             if hasattr(task, 'DB'):
@@ -111,16 +128,22 @@ def main_worker_shutdown(**kwargs):
                 sys.stdout.flush()
     except Exception as e:
         sys.stdout.flush()
+    """
+
 
 # shutdown each worker DB instance
 @worker_process_shutdown.connect()
 def process_worker_shutdown(**kwargs):
-    DB.shutdown()
+    logger.info('process_worker_shutdown()')
 
-    for name, task in app.tasks.items():
-        if hasattr(task, 'DB'):
-            task.DB.shutdown()
-            task.DB.th.join()
+    DB.shutdown()
+    for t in DB.th:
+        t.join()
+
+    #for name, task in app.tasks.items():
+    #    if hasattr(task, 'DB'):
+    #        task.DB.shutdown()
+    #        task.DB.th.join()
 
 
 @eventlet_pool_preshutdown.connect()
@@ -302,7 +325,7 @@ def db_print_remote(res, id):
 
 
 if __name__ == '__main__':
+    # not run by celery
     logger.error('starting as __main__')
     app.start()
-    logger.error('app aroo!')
     DB.shutdown()
