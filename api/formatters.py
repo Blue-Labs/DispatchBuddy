@@ -178,10 +178,16 @@ class HTML(Formatter):
               <td>Address      &nbsp;</td><td><a href="{gmapurl}">{address}<br>{gmapurl}</a></td>
             </tr>
             <tr>
+              <td>Subdivision  &nbsp;</td><td>{subdivision}</a></td>
+            </tr>
+            <tr>
               <td>Cross        &nbsp;</td><td>{cross}</td>
             </tr>
             <tr>
               <td>Directions   &nbsp;</td><td><a href="{gmapurldir}">{gmapurldir}</a></td>
+            </tr>
+            <tr>
+              <td>Premise      &nbsp;</td><td>{premise}</td>
             </tr>
             <tr>
               <td>Notes        &nbsp;</td><td>{notes}</td>
@@ -225,7 +231,7 @@ class SMS(Formatter):
         self.msgtype = msgtype
 
     def format(self, evdict):
-        self.tmpl = '''{msgtype} at {date_time}\n  {address}\n  {nature}\n--\n{notes:.90}'''
+        self.tmpl = '''{msgtype} at {date_time}\n  {address}\n  {subdivision}\n  {nature}\n--\n{notes:.90}\n{premise:.90}'''
         return self.tmpl.format(**evdict)
 
 class MMS(Formatter):
@@ -233,6 +239,6 @@ class MMS(Formatter):
         self.msgtype = msgtype
 
     def format(self, evdict):
-        self.tmpl = '''{msgtype} at {date_time}\n  {address}\n  {nature}\n--\n{notes}\n\n
-Cross:\n  {cross}\n\nUnits: {units}\n\nLocation: {gmapurl}\n\nDirections: {gmapurldir}'''
+        self.tmpl = '''{msgtype} at {date_time}\n  {address}\n  {subdivision}\n  {nature}\n--\n{notes}\n\n
+Cross:\n  {cross}\n\nUnits: {units}\n\nLocation: {gmapurl}\n\nDirections: {gmapurldir}\n\nPremise: {premise}'''
         return self.tmpl.format(**evdict)
