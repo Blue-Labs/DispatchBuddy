@@ -389,7 +389,7 @@ class PCLParser():
                 except IndexError:
                     _print = False
                     glyf_coordinate_to_ascii[self.current_font_id][_glyph_data] = pc
-                    self.logger.error('glyf data not found, adding chr(\'{}\') to font set {} with {}'.format(pc, self.current_font_id, _glyph_data))
+                    self.logger.error('glyf data not found, adding chr(\'{}\') to font set {}'.format(pc, self.current_font_id))
 
             C = _c(_format, _descriptor_size, _class, _glyph_id, pc,
                    _data_size, _gd_number_of_contours,
@@ -1120,6 +1120,10 @@ class Matrix():
              'gmapurl'     :'',                           # google maps address location
              'gmapurldir'  :'',                           # gmaps drive route from 31 camp st to address
              'event_uuid'  :id,                           # event UUID
+
+             'premise'     :'',                           # reason for dispatch
+             'subdivision' :'',                           #
+             'ra'          :'',                           #
              }
 
         ev = namedtuple('Event', _.keys())
@@ -1191,7 +1195,7 @@ class Matrix():
         # on the current line so we append this text to our existing line
         for y in sorted(matrix):
             xmatrix = sorted([(x,g.pc) for x,g in matrix[y].items()])
-            print('matrix:  {:<5} {}'.format(y, xmatrix))
+            self.logger.debug('matrix:  {:<5} {}'.format(y, xmatrix))
 
             # line continuation?
             if prelines and xmatrix[0][0] > 1000:
@@ -1208,7 +1212,7 @@ class Matrix():
                 if x_p and x > x_p + 400: # only push if line has already been started, otherwise we're pushing
                                           #  a blank line at the start of every char set
 
-                    print('preline append: {}'.format(line))
+                    self.logger.debug('preline append: {}'.format(line))
                     prelines.append(self.line_filter(line))
                     line = ''
                 try:
@@ -1222,14 +1226,14 @@ class Matrix():
         del (matrix)
 
         for pl in prelines:
-            print('pl: {}'.format(pl))
+            self.logger.debug('pl: {}'.format(pl))
 
         # now process them
         for line in prelines:
             if not line:
                 continue
 
-            print('LINE(len={}): {!r}'.format(len(line),line))
+            self.logger.info('LINE(len={}): {!r}'.format(len(line),line))
 
             # if at the beginning, look for the keywords of dispatch, dispose, etc
             # otherwise:
