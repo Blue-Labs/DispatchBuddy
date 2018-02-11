@@ -218,7 +218,7 @@ class PCLParser():
             print('instantiating our OWN LOGGER')
             logging.basicConfig()
             logger = logging.getLogger('bluelabs.dispatchbuddy.parsers.pjl_lexmark')
-            logger.setLevel(logging.DEBUG)
+            logger.setLevel(logging.INFO)
         self.logger   = logger
         self.id       = id
 
@@ -354,7 +354,10 @@ class PCLParser():
                 _glyph_data = self.read_block(_data_size-4-10).rstrip(b'\x00')
 
                 self.read_block(1) # terminating \0 and reserved byte
-                _glyph_checksum = ord(self.read_block(1))
+                try:
+                    _glyph_checksum = ord(self.read_block(1))
+                except:
+                    self.logger.warning('Glyph checksum byte missing, early end of block')
             else:
                 _gd_number_of_contours = 0
                 _gd_x_min = 0
@@ -385,17 +388,17 @@ class PCLParser():
                     glyf = [k for k,v in glyf_coordinate_to_ascii[self.current_font_id].items() if v == pc][0]
                     del glyf_coordinate_to_ascii[self.current_font_id][glyf]
                     glyf_coordinate_to_ascii[self.current_font_id][_glyph_data] = pc
-                    self.logger.warning('replaced glyph data for \'{}\' in font set {}'.format(pc, self.current_font_id))
+                    self.logger.info('replaced glyph data for \'{}\' in font set {}'.format(pc, self.current_font_id))
                 except IndexError:
                     _print = False
                     glyf_coordinate_to_ascii[self.current_font_id][_glyph_data] = pc
-                    self.logger.error('glyf data not found, adding chr(\'{}\') to font set {}'.format(pc, self.current_font_id))
+                    self.logger.info('glyf data not found, adding chr(\'{}\') to font set {}'.format(pc, self.current_font_id))
 
             C = _c(_format, _descriptor_size, _class, _glyph_id, pc,
                    _data_size, _gd_number_of_contours,
                    _gd_x_min, _gd_y_min, _gd_x_max, _gd_y_max,
                    _glyph_data)
-            print(C)
+            self.logger.debug(C)
 
             if _print is None:
                 self.logger.debug('Glyph(\x1b[1;36m{!r}\x1b[0m) stored at index[{}/{}]'.format(pc, self.current_font_id, self.current_character_data_code))
@@ -418,7 +421,7 @@ class PCLParser():
 
         # raster things
         elif cmd == b'*bM':
-            decoder = {0:'Default (uncoded)', 1:'RLE', 2:'TIFF', 3:'DeltaRow'}[int(value)]
+            decoder = {0:'Default (uncoded)', 1:'RLE', 2:'TIFF', 3:'DeltaRow'}.get(int(value), 'unknown')
             self.logger.debug('use {} decoding on raster data'.format(decoder))
 
         # we don't do anything with this data right now
@@ -430,131 +433,139 @@ class PCLParser():
 
             elif cmd == b')sW':
                 # read font data
-                fh = OrderedDict()
+                # we can live without font data as we hardcode an alphabet translation
+                # for Meriden Fire
+                try:
+                    fh = OrderedDict()
 
-                fh['font_descriptor_size']       = struct.unpack('>H', self.read_block(2))[0]
-                _ = ord(self.read_block(1))
-                fh['header_format']              = '{}/{}'.format(_, self.font_header_formats[_])
-                _ = ord(self.read_block(1))
-                fh['font_type']                  = '{}/{}'.format(_, self.font_type[_])
-                fh['style']                      = ord(self.read_block(1)) << 8
-                self.read_block(1) # reserved
-                fh['baseline_position']          = struct.unpack('>H', self.read_block(2))[0]
-                fh['cell_width']                 = struct.unpack('>H', self.read_block(2))[0]
-                fh['cell_height']                = struct.unpack('>H', self.read_block(2))[0]
-                fh['orientation']                = {0:'portrait',1:'landscape',2:'rev. portrait',3:'rev landscape'}[ord(self.read_block(1))]
-                fh['spacing']                    = {0:'fixed',1:'proportional'}[ord(self.read_block(1))]
-                _ = struct.unpack('>H', self.read_block(2))[0]
-                _set = _ >> 5
-                _term = chr((_ & 31) + 64)
-                fh['symbol_set']                 = '{}{}'.format(_set,_term)
-                _ = struct.unpack('>H', self.read_block(2))[0]
-                fh['pitch']                      = _
-                fh['height']                     = struct.unpack('>H', self.read_block(2))[0]
-                fh['x-height']                   = struct.unpack('>H', self.read_block(2))[0]
-                fh['width_type']                 = ord(self.read_block(1))
-                fh['style']                     |= ord(self.read_block(1))
+                    fh['font_descriptor_size']       = struct.unpack('>H', self.read_block(2))[0]
+                    _ = ord(self.read_block(1))
+                    fh['header_format']              = '{}/{}'.format(_, self.font_header_formats[_])
+                    _ = ord(self.read_block(1))
+                    fh['font_type']                  = '{}/{}'.format(_, self.font_type[_])
+                    fh['style']                      = ord(self.read_block(1)) << 8
+                    self.read_block(1) # reserved
+                    fh['baseline_position']          = struct.unpack('>H', self.read_block(2))[0]
+                    fh['cell_width']                 = struct.unpack('>H', self.read_block(2))[0]
+                    fh['cell_height']                = struct.unpack('>H', self.read_block(2))[0]
+                    fh['orientation']                = {0:'portrait',1:'landscape',2:'rev. portrait',3:'rev landscape'}[ord(self.read_block(1))]
+                    fh['spacing']                    = {0:'fixed',1:'proportional'}[ord(self.read_block(1))]
+                    _ = struct.unpack('>H', self.read_block(2))[0]
+                    _set = _ >> 5
+                    _term = chr((_ & 31) + 64)
+                    fh['symbol_set']                 = '{}{}'.format(_set,_term)
+                    _ = struct.unpack('>H', self.read_block(2))[0]
+                    fh['pitch']                      = _
+                    fh['height']                     = struct.unpack('>H', self.read_block(2))[0]
+                    fh['x-height']                   = struct.unpack('>H', self.read_block(2))[0]
+                    fh['width_type']                 = ord(self.read_block(1))
+                    fh['style']                     |= ord(self.read_block(1))
 
-                _v = fh['style']
-                posture          =  _v & 0b11
-                appearance_width = (_v & 0b11100) >> 2
-                structure        = (_v & 0b1111100000) >> 5
+                    _v = fh['style']
+                    posture          =  _v & 0b11
+                    appearance_width = (_v & 0b11100) >> 2
+                    structure        = (_v & 0b1111100000) >> 5
 
-                posture = {0:'upright', 1:'italic', 2:'alt italic', 3:'reserved'}[posture]
+                    posture = {0:'upright', 1:'italic', 2:'alt italic', 3:'reserved'}[posture]
 
-                fh['style'] = posture
+                    fh['style'] = posture
 
-                appearance_width = {
-                  0: 'normal',
-                  1: 'condensed',
-                  2: 'compressed or extra condensed',
-                  3: 'extra compressed',
-                  4: 'ultra compressed',
-                  5: 'reserved',
-                  6: 'extended or expanded',
-                  7: 'extra extended or extra expanded',
-                }[appearance_width]
+                    appearance_width = {
+                      0: 'normal',
+                      1: 'condensed',
+                      2: 'compressed or extra condensed',
+                      3: 'extra compressed',
+                      4: 'ultra compressed',
+                      5: 'reserved',
+                      6: 'extended or expanded',
+                      7: 'extra extended or extra expanded',
+                    }[appearance_width]
 
-                structure = {
-                  0: 'solid',
-                  1: 'outline',
-                  2: 'inline',
-                  3: 'contour, distressed',
-                  4: 'solid w/ shadow',
-                  5: 'outline w shadow',
-                  6: 'inline w/ shadow',
-                  7: 'contour w/ shadow',
-                  8: 'patterned (complex)',
-                  9: 'patterned (complex)',
-                  10: 'patterned (complex)',
-                  11: 'patterned (complex)',
-                  12: 'patterned w/ shadow',
-                  13: 'patterned w/ shadow',
-                  14: 'patterned w/ shadow',
-                  15: 'patterned w/ shadow',
-                  16: 'inverse',
-                  17: 'inverse in open border',
-                  18: '',
-                  19: '',
-                  20: '',
-                  21: '',
-                  22: '',
-                  23: '',
-                  24: '',
-                  25: '',
-                  26: '',
-                  27: '',
-                  28: '',
-                  29: '',
-                  30: '',
-                  31: 'unknown',
-                }[structure]
+                    structure = {
+                      0: 'solid',
+                      1: 'outline',
+                      2: 'inline',
+                      3: 'contour, distressed',
+                      4: 'solid w/ shadow',
+                      5: 'outline w shadow',
+                      6: 'inline w/ shadow',
+                      7: 'contour w/ shadow',
+                      8: 'patterned (complex)',
+                      9: 'patterned (complex)',
+                      10: 'patterned (complex)',
+                      11: 'patterned (complex)',
+                      12: 'patterned w/ shadow',
+                      13: 'patterned w/ shadow',
+                      14: 'patterned w/ shadow',
+                      15: 'patterned w/ shadow',
+                      16: 'inverse',
+                      17: 'inverse in open border',
+                      18: '',
+                      19: '',
+                      20: '',
+                      21: '',
+                      22: '',
+                      23: '',
+                      24: '',
+                      25: '',
+                      26: '',
+                      27: '',
+                      28: '',
+                      29: '',
+                      30: '',
+                      31: 'unknown',
+                    }[structure]
 
-                fh['style'] = ', '.join([posture, appearance_width, structure])
+                    fh['style'] = ', '.join([posture, appearance_width, structure])
 
-                fh['stroke_weight']              = ord(self.read_block(1))
-                fh['typeface']                   = ord(self.read_block(1))
-                fh['typeface']                  |= (ord(self.read_block(1)) << 8)
-                fh['serif_style']                = ord(self.read_block(1))
-                fh['quality']                    = {0:'draft',1:'nlq',2:'lq'}[ord(self.read_block(1))]
-                fh['placement']                  = ord(self.read_block(1))
-                fh['underline_position']         = ord(self.read_block(1))
-                fh['underline_thickness']        = ord(self.read_block(1))
-                fh['text_height']                = struct.unpack('>H', self.read_block(2))[0]
-                fh['text_width']                 = struct.unpack('>H', self.read_block(2))[0]
-                fh['first_code']                 = struct.unpack('>H', self.read_block(2))[0]
-                fh['last_code']                  = struct.unpack('>H', self.read_block(2))[0]
-                fh['pitch_extended']             = ord(self.read_block(1))
-                fh['height_extended']            = ord(self.read_block(1))
-                fh['cap_height']                 = struct.unpack('>H', self.read_block(2))[0]
-                fh['font_number']                = struct.unpack('>I', self.read_block(4))[0]
+                    fh['stroke_weight']              = ord(self.read_block(1))
+                    fh['typeface']                   = ord(self.read_block(1))
+                    fh['typeface']                  |= (ord(self.read_block(1)) << 8)
+                    fh['serif_style']                = ord(self.read_block(1))
+                    fh['quality']                    = {0:'draft',1:'nlq',2:'lq'}[ord(self.read_block(1))]
+                    fh['placement']                  = ord(self.read_block(1))
+                    fh['underline_position']         = ord(self.read_block(1))
+                    fh['underline_thickness']        = ord(self.read_block(1))
+                    fh['text_height']                = struct.unpack('>H', self.read_block(2))[0]
+                    fh['text_width']                 = struct.unpack('>H', self.read_block(2))[0]
+                    fh['first_code']                 = struct.unpack('>H', self.read_block(2))[0]
+                    fh['last_code']                  = struct.unpack('>H', self.read_block(2))[0]
+                    fh['pitch_extended']             = ord(self.read_block(1))
+                    fh['height_extended']            = ord(self.read_block(1))
+                    fh['cap_height']                 = struct.unpack('>H', self.read_block(2))[0]
+                    fh['font_number']                = struct.unpack('>I', self.read_block(4))[0]
 
-                _num = fh['font_number'] & 0xffffff
-                _vend = (fh['font_number'] >> 24) & 0b1111111
-                _vend = {65:'Adobe',66:'Bitstream',67:'&AFGA;',72:'Bigelow & Holmes',76:'Linotype',77:'Monotype'}[_vend]
-                _nat  = fh['font_number'] >> 31
+                    _num = fh['font_number'] & 0xffffff
+                    _vend = (fh['font_number'] >> 24) & 0b1111111
+                    _vend = {65:'Adobe',66:'Bitstream',67:'&AFGA;',72:'Bigelow & Holmes',76:'Linotype',77:'Monotype'}.get(_vend, 'unknown')
+                    _nat  = fh['font_number'] >> 31
 
-                fh['font_number'] = '{}; {}; {}'.format(_num, _vend, _nat >0)
+                    fh['font_number'] = '{}; {}; {}'.format(_num, _vend, _nat >0)
 
-                fh['font_name']                  = (self.read_block(16)).strip(b'\0').decode()
+                    fh['font_name']                  = (self.read_block(16)).strip(b'\0').decode()
 
-                fh['scale_factor']               = struct.unpack('>H', self.read_block(2))[0]
-                fh['master_underline_position']  = struct.unpack('>H', self.read_block(2))[0]
-                fh['master_underline_thickness'] = struct.unpack('>H', self.read_block(2))[0]
-                fh['font_scaling_technology']    = ord(self.read_block(1))
-                fh['variety']                    = ord(self.read_block(1))
-                fh['additional']                 = self.read_block(fh['font_descriptor_size']-72)
+                    fh['scale_factor']               = struct.unpack('>H', self.read_block(2))[0]
+                    fh['master_underline_position']  = struct.unpack('>H', self.read_block(2))[0]
+                    fh['master_underline_thickness'] = struct.unpack('>H', self.read_block(2))[0]
+                    fh['font_scaling_technology']    = ord(self.read_block(1))
+                    fh['variety']                    = ord(self.read_block(1))
+                    fh['additional']                 = self.read_block(fh['font_descriptor_size']-72)
 
-                for k,v in fh.items():
-                  self.logger.debug('{:<32}: {}'.format(k,v))
+                    for k,v in fh.items():
+                      self.logger.debug('{:<32}: {}'.format(k,v))
 
-                self.logger.debug('reading {} bytes of font data'.format(int(value) - fh['font_descriptor_size']-2))
-                fh['segments'] = self.read_segmented_font_data(int(value) - fh['font_descriptor_size']-2)
+                    self.logger.debug('reading {} bytes of font data'.format(int(value) - fh['font_descriptor_size']-2))
+                    fh['segments'] = self.read_segmented_font_data(int(value) - fh['font_descriptor_size']-2)
 
-                fh['reserved']                   = ord(self.read_block(1))
-                fh['checksum']                   = ord(self.read_block(1))
+                    fh['reserved']                   = ord(self.read_block(1))
+                    fh['checksum']                   = ord(self.read_block(1))
 
-                self.fonts[self.current_font_id] = fh
+                    self.fonts[self.current_font_id] = fh
+                except Exception as e:
+                    __ = traceback.format_exc(5)
+                    self.logger.warning('Failed to parse font data: {} :: {}'.format(e, __))
+                    # try to recover
+                    self.unread_block(2)
 
             else:
                 self.read_block(int(value), cmd)
@@ -573,7 +584,7 @@ class PCLParser():
 
         segments = []
         do_break = False
-        while size:
+        while size > 0:
             SI = self.read_block(2)
             self.logger.debug('SI: {!r}'.format(SI))
 
@@ -585,8 +596,11 @@ class PCLParser():
 
             ss = 0
             if not SI == b'\x00\x00':
-                print('reading size')
-                ss = struct.unpack('>H', self.read_block(2))[0]
+                _rb = self.read_block(2)
+                try:
+                    ss = struct.unpack('>H', _rb)[0]
+                except:
+                    self.logger.warning('failed to unpack SI, should be \\x00\\x00; _rb is {!r}'.format(_rb))
             else:
                 self.unread_block(1) # manual intervention for possibly corrupt font file
             size -= 4;
@@ -638,12 +652,12 @@ class PCLParser():
                     if not T.length:
                         continue
 
-                    print('blob: {}-{}'.format(T.offset,T.offset+T.length))
+                    self.logger.debug('blob: {}-{}'.format(T.offset,T.offset+T.length))
                     off_start = T.offset - 12 - (16*len(_tables))
                     _data = blob[off_start:off_start+T.length]
 
                     if not len(_data) == T.length:
-                      self.logger.error('WHINE AND MOAN')
+                      self.logger.wwarning('len(_data)={} != T.length={}'.format(len(_data), T.length))
 
                     T = T._replace(data=_data)
 
@@ -741,6 +755,7 @@ class PCLParser():
 
                 # if we're past the expected amount and we encounter an ESC, assume we're done
                 if len(data) > amount:
+                    self.logger.warning('read beyond limit: len(data)={}, amount={}'.format(len(data), amount))
                     if cmd == b'(sW':
                         m = re.search(b'\x1b', data[amount:])
                     else:
@@ -754,7 +769,7 @@ class PCLParser():
                         self.logger.debug('found some sort of escape at {0}'.format(ynow))
                         zlen = len(data)
                         ynow = stream.seek(skip_offset+ynow, os.SEEK_SET)
-                        self.logger.debug('terminated by ESC after {} bytes (expected to end by {})'.format(zlen,amount))
+                        self.logger.warning('terminated by ESC after {} bytes (expected to end by {})'.format(zlen,amount))
                         break
         else:
             data = stream.read(amount)
@@ -877,7 +892,12 @@ class PCLParser():
         '''
 
 
-    def parse(self):
+    def parse(self, id=None):
+
+        # for multi parsing, the uuid is passed to us here
+        if id:
+            self.id = id
+
         matrix       = {}
         stream = self.pclblob
         skip = b''
@@ -886,9 +906,9 @@ class PCLParser():
 
         while 1:
             inb = stream.read(1)
-            #self.logger.debug('stream read: {0}'.format(inb))
+            self.logger.debug('stream read: {0}'.format(inb))
 
-            if not inb:
+            if inb == b'':
                 self.logger.debug('end of file, byebye')
                 break
 
@@ -955,17 +975,24 @@ class PCLParser():
                                     # read until another ESC is found
                                     while 1:
                                         inz = stream.read(1)
+                                        if inz == b'':
+                                            self.logger.warning('unexpected EOF')
+                                            break
                                         if inz == self.ESC:
                                             stream.seek(-1, os.SEEK_CUR)
                                             finish_seq = True
                                             break
-                                        self.logger.debug(' unexpected: {}'.format(inz))
+                                        self.logger.debug('read: {!r}'.format(inz))
                                     if finish_seq:
                                         break
 
 
                             while 1:
                                 inz = stream.read(1)
+                                if inz == b'':
+                                    self.logger.warning('unexpected EOF')
+                                    break
+
                                 if len(inz):
                                     if ord(inz) in list((45, 46)) + list(range(48, 58)):
                                         value += inz
@@ -978,19 +1005,24 @@ class PCLParser():
                             #self.logger.debug('{0} has a value'.format(value))
 
                             termination = stream.read(1)
+                            if termination == b'':
+                                break
 
                             # not a valid terminator?
                             if not ord(termination) in list(range(64, 91))+ list(range(97, 123)):
                                 self.logger.warning('invalid terminator? {0}'.format(termination))
 
-                                # read until another ESC is found
+                                self.logger.debug('dummy reading until ESC is found')
                                 while 1:
                                     inz = stream.read(1)
+                                    if inz == b'':
+                                        self.logger.warning('unexpected EOF')
+                                        break
                                     if inz == self.ESC:
                                         stream.seek(-1, os.SEEK_CUR)
                                         finish_seq = True
                                         break
-                                    #self.logger.debug(str(inz))
+                                    self.logger.debug('read: {!r}'.format(inz))
                                 if finish_seq:
                                     break
 
@@ -1018,14 +1050,15 @@ class PCLParser():
                             continue
 
                         if finished:
-                            #self.logger.debug('exit ESC processing')
+                            self.logger.debug('exit ESC processing')
                             continue
 
-                    #self.logger.debug('invalid escape sequence found? {0}'.format(parameter+group+value+termination))
+                    self.logger.debug('invalid escape sequence found? {0}'.format(parameter+group+value+termination))
 
                 else:
                     # continue until we find another ESC
                     uesc = b'\x1b'
+                    self.logger.debug('dummy reading until ESC is found')
                     while 1:
                         uesc += parameter
                         parameter = stream.read(1)
@@ -1041,11 +1074,11 @@ class PCLParser():
                     if not pc: # try the manual glyph set
                         pc = self.glyph_data_blocks[-1].get(ord(inb))
                         if pc:
-                            self.logger.error('had to find {} in manual font'.format(pc))
+                            self.logger.info('notable; found {} in manual font'.format(pc))
                     if not pc: # try the default glyph set
                         pc = self.glyph_data_blocks[0].get(ord(inb))
                         if pc:
-                            self.logger.error('had to find {} in alt font'.format(pc))
+                            self.logger.info('notable; found {} in alt font'.format(pc))
 
                     # last ditch effort (this can garbage up things)
                     if not pc: # try all font sets sent to us
@@ -1053,7 +1086,7 @@ class PCLParser():
                         x = [x for x in [self.glyph_data_blocks[fs].get(ord(inb)) for fs in self.fonts if not fs == self.current_font_id ] if x]
                         if x:
                             pc = x[0]
-                            self.logger.error('had to find {} {} in alt font'.format(omgwtf, pc))
+                            self.logger.info('notable; found {} {} in alt font'.format(omgwtf, pc))
 
                     if pc and not unknown_glyph_tally:
                         self.logger.debug('adding to final stream: {!r}'.format(pc.pc))
@@ -1063,7 +1096,7 @@ class PCLParser():
                         unknown_glyph_tally += 1
                         if not pc and not inb == b'\r':
                             # no more +29 nonsense, we now lookup glyf coords to map from arialbd.ttf
-                            self.logger.error('({}) unknown glyph id in set {}:\x1b[1;31m{:> 4}\x1b[0m, possibly:{:> 4}/{}'
+                            self.logger.info('({}) unknown glyph id in set {}:\x1b[1;31m{:> 4}\x1b[0m, possibly:{:> 4}/{!r}'
                                 .format(unknown_glyph_tally, self.current_font_id,
                                         ord(inb),
                                         (ord(inb)+29)%256, chr((ord(inb)+29)%256))
@@ -1097,33 +1130,40 @@ class PCLParser():
 
 
 class Matrix():
+    ''' This calls takes the raw parsed lines and populates the event dictionary
+        which becomes a named tuple. Some lines appear in fragments and need
+        properly reformed
+    '''
     parse_error      = False
     # set defaults and make sure all keys exist
+
+    city_codes = {'MER':'Meriden, CT'}
 
 
     def __init__(self, logger=None, id=None):
         self.logger = logger
 
-        _ = {'date'        :time.strftime('%F'),          # simple date on dispatch
-             'time_out'    :time.strftime('%H:%M:%S'),    # simple time on dispatch
-             'isotimestamp':None,                         # generated from date + time out
-             'date_time'   :None,                         # generated from date + time out
-             'nature'      :'INCOMPLETE OR DAMAGED DISPATCH', # coded nature
-             'business'    :'',                           # name of business or residence
-             'notes'       :'',                           # description of event
-             'msgtype'     :'dispatch',                   # no longer sent in dispatches
-             'cross'       :'',                           # cross streets
-             'address'     :'',                           # address of incident
-             'units'       :'',                           # units assigned
-             'city'        :'',                           # almost always 'MER'
-             'case_number' :'',                           # no longer sent in dispatches
-             'gmapurl'     :'',                           # google maps address location
-             'gmapurldir'  :'',                           # gmaps drive route from 31 camp st to address
-             'event_uuid'  :id,                           # event UUID
+        _ = {'date'           :time.strftime('%F'),          # simple date on event
+             'time_out'       :time.strftime('%H:%M:%S'),    # simple time on event
+             'isotimestamp'   :None,                         # generated from date + time out
+             'date_time'      :None,                         # generated from date + time out
+             'nature'         :'INCOMPLETE OR DAMAGED DISPATCH', # coded nature
+             'business'       :'',                           # name of business or residence
+             'notes'          :'',                           # description of event
+             'msgtype'        :'dispatch',                   # no longer sent in dispatches
+             'cross'          :'',                           # cross streets
+             'address'        :'',                           # address of incident
+             'units'          :'',                           # units assigned
+             'city'           :'',                           # almost always 'MER'
+             'incident_number':'',
+             'report_number'  :'',
+             'gmapurl'        :'',                           # google maps address location
+             'gmapurldir'     :'',                           # gmaps drive route from 31 camp st to address
+             'event_uuid'     :id,                           # event UUID
 
-             'premise'     :'',                           # reason for dispatch
-             'subdivision' :'',                           #
-             'ra'          :'',                           #
+             'premise'        :'',                           # reason for dispatch
+             'subdivision'    :'',                           #
+             'ra'             :'',                           #
              }
 
         ev = namedtuple('Event', _.keys())
@@ -1143,6 +1183,7 @@ class Matrix():
         line = re.sub(':\s+', ':', line)
         line = re.sub('^\s+', '', line)
         line = re.sub('\s+$', '', line)
+        line = re.sub('(Incident|Report)#', '\\1_number', line)
         if len(line):
             # use ISO 8601 ordering; MFD uses MM/DD/YY, change to YY/MM/DD
             if line.startswith('Date:'):
@@ -1157,7 +1198,12 @@ class Matrix():
 
     def post_filters(self):
         # convert to ISO 8601 date time format, then make it easy to read
-        x           = parser.parse (self.ev.date + 'T' + self.ev.time_out + time.strftime('%z'))
+        try:
+            x           = parser.parse (self.ev.date + 'T' + self.ev.time_out[:9] + time.strftime('%z'))
+        except:
+            self.logger.error('unable to parse into ISO timestamp: date: {!r}, time:{!r}'
+                .format(self.ev.date, self.ev.time_out))
+            raise
         self.ev_update('isotimestamp', str(x))
         self.ev_update('date_time', x.strftime('%b%d, ')+x.strftime('%l:%M%P').strip())
 
@@ -1243,80 +1289,20 @@ class Matrix():
 
             # ignore this word
             if line == 'END':
-                #self.logger.debug('  ignored')
                 continue
 
-            # no longer applicable
-            #    if line.lower() in ('dispatch','dispose','update','en route','on scene'):
-            #        beginning = False
-            #        self.ev_update('msgtype', line.lower())
-
             else:
-                m = re.match('(\w+(?:\s\w+|)):(.*)', line)
+                m = re.match('([\w_]+(?:\s\w+|)):(.*)', line)
                 if m:
-                    '''
-                    # if this line matched and we were holding a bookmark for appending, delete
-                    if address:
-                        self.ev_update('address', address)
-                        address = None
-                    elif cross:
-                        self.ev_update('cross', cross)
-                        cross = None
-                    elif nature:
-                        self.ev_update('nature', nature)
-                        nature = None
-                    elif notes:
-                        self.ev_update('notes', notes)
-                        notes = None
-                    '''
-
                     lhs = m.group(1).lower()
                     if hasattr(self.ev, lhs):
-                        #self.logger.info('  LHS found')
-                        '''
-                        if lhs == 'address':
-                            address = m.group(2)
-                        elif lhs == 'cross':
-                            cross = m.group(2)
-                        elif lhs == 'nature':
-                            nature = m.group(2)
-                        elif lhs == 'notes':
-                            notes = m.group(2)
+                        if lhs == 'city':
+                            rhs = self.city_codes.get(m.group(2), m.group(2))
                         else:
-                        '''
-                        self.ev_update(lhs, m.group(2))
+                            rhs = m.group(2)
+                        self.ev_update(lhs, rhs)
                     else:
                         self.logger.warning('{} is an unrecognized line type: {}'.format(lhs, m.group(2)))
-
-                # are we bookmarking lines to append?
-                '''
-                else:
-                    if address:
-                        address += line
-                    elif cross:
-                        cross   += ' & ' + line
-                    elif nature:
-                        nature  += line
-                    elif notes:
-                        notes   += line
-
-                    self.logger.debug('  append this line')
-                '''
-
-        '''
-        if address:
-            self.ev_update('address', address)
-            address = None
-        elif cross:
-            self.ev_update('cross', cross)
-            cross = None
-        elif nature:
-            self.ev_update('nature', nature)
-            nature = None
-        elif notes:
-            self.ev_update('notes', notes)
-            notes = None
-        '''
 
         self.post_filters()
 
