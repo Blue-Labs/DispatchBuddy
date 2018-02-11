@@ -20,6 +20,7 @@ import os
 import configparser
 import requests
 import logging
+import pyrebase
 
 from celery import Celery, Task, group, chord, chain
 from celery.result import GroupResult
@@ -32,6 +33,7 @@ from api.database import Database
 from api.messaging import Messaging
 from memory_profiler import profile
 from parsers.pjl_lexmark import PCLParser as Parser
+
 
 # i don't have time to resolve relative imports, fuck it
 sys.path.append('/var/bluelabs/DispatchBuddy')
@@ -106,10 +108,15 @@ def start_process_init_db(*args, **kwargs):
     # DB instance so we don't have conflicting network connections. each task is a
     # separate Linux process. simple variables can be shared via app(), those such as
     # network connections, must never be shared
-    global DB
+    global DB, firebase_user, firebase_db
     DB = Database(config)
     logger.info('starting worker process, DB is {}, DB.conn is {}'.format(DB, DB.conn))
     logger.info('\x1b[1;34mprocess_init({}, {}) {!r}\x1b[0m'.format(os.getpid(), args, kwargs))
+
+    firebase = pyrebase.initialize_app(config['Firebase'])
+    auth = firebase.auth()
+    firebase_user = auth.sign_in_with_email_and_password(config['Firebase']['username'], config['Firebase']['password'])
+    firebase_db = firebase.database()
 
 
 # shutdown the MainProcess DB (note; you won't see logging information from DB here.)
@@ -155,122 +162,124 @@ def preshutdown(*args, **kwargs):
 
 @app.task(bind=True)
 def dispatch_job(self, id, payload):
-        ''' Decode the PCL data and extract textual words, store in database, and if
-            unique, broadcast it to all of our configured gateways
+    ''' Decode the PCL data and extract textual words, store in database, and if
+        unique, broadcast it to all of our configured gateways
 
-              payload: string
-        '''
+          payload: string
+    '''
 
-        logger.debug('DB is: {}'.format(DB))
-        logger.debug('DB.conn is: {}'.format(DB.conn))
-        logger.debug('DB.rxl is: {}'.format(DB.recipient_list))
+    logger.debug('DB is: {}'.format(DB))
+    logger.debug('DB.conn is: {}'.format(DB.conn))
+    logger.debug('DB.rxl is: {}'.format(DB.recipient_list))
 
-        # determine what type of payload it is -- right now we only have tcp/9100 lexmark PCL data
-        try:
-            logger.debug('{}'.format(self.request))
-        except Exception as e:
-            logger.debug('could not print self.request: {}'.format(e))
+    # determine what type of payload it is -- right now we only have tcp/9100 lexmark PCL data
+    try:
+        logger.debug('{}'.format(self.request))
+    except Exception as e:
+        logger.debug('could not print self.request: {}'.format(e))
 
-        logger.debug('got {} raw bytes in payload for {}'.format(len(payload),id))
-        payload = base64.b64decode(payload.encode())
-        logger.debug('decoding {} bytes in payload for {}'.format(len(payload),id))
-        logger.debug('first 200 bytes: {!r}'.format(payload[:200]))
+    logger.debug('got {} raw bytes in payload for {}'.format(len(payload),id))
+    payload = base64.b64decode(payload.encode())
+    logger.debug('decoding {} bytes in payload for {}'.format(len(payload),id))
+    logger.debug('first 200 bytes: {!r}'.format(payload[:200]))
 
-        if not (payload.startswith(b'\0\x1b%-12345X@PJL') and b'Lexmark' in payload[:200]):
-            logger.debug('incorrect prelude, ignoring')
-            return
+    if not (payload.startswith(b'\0\x1b%-12345X@PJL') and b'Lexmark' in payload[:200]):
+        logger.debug('incorrect prelude, ignoring')
+        return
 
-        # if no parser has been imported, an exception will happen here
+    # if no parser has been imported, an exception will happen here
 
-        parser = Parser(logger, id)
-        parser.load(data=payload)
-        ev = parser.parse()
-
-
-        if os.getenv('TESTING'):
-            ev = ev._replace(**{'notes':'** TESTING ** '+ev.notes})
-            ev = ev._replace(**{'units':'** TESTING ** '+ev.units})
-            ev = ev._replace(**{'nature':'** TESTING ** '+ev.nature})
-
-        for k,v in sorted(ev._asdict().items()):
-            logger.debug('  {:<12} {}'.format(k,v))
-
-        store_event(id, payload, ev._asdict())
-
-        if unique_message(ev) is False:
-            logger.info('skipping as this appears to be a duplicate')
-            return
-
-        res = (db_broadcast(id, ev._asdict()) | delivery_report.s(id) ) ()
-        logger.info('res: {}'.format(res))
-
-        #self.db_print_remote(id)
+    parser = Parser(logger, id)
+    parser.load(data=payload)
+    ev = parser.parse()
 
 
+    if os.getenv('TESTING'):
+        ev = ev._replace(**{'notes':'** TESTING ** '+ev.notes})
+        ev = ev._replace(**{'units':'** TESTING ** '+ev.units})
+        ev = ev._replace(**{'nature':'** TESTING ** '+ev.nature})
 
+    for k,v in sorted(ev._asdict().items()):
+        logger.debug('  {:<12} {}'.format(k,v))
+
+    store_event(id, payload, ev._asdict())
+
+    if unique_message(ev) is False:
+        logger.info('skipping as this appears to be a duplicate')
+        return
+
+    res = (db_broadcast(id, ev._asdict()) | delivery_report.s(id) ) ()
+    logger.info('res: {}'.format(res))
+
+    #self.db_print_remote(id)
 
 
 def store_event(id, payload, ev):
-        fname = '/var/db/DispatchBuddy/evdata/{}.pcl'.format(id)
-        try:
-            with open(fname, 'wb') as f:
-                f.write(payload)
-            logger.debug('{}.pcl stored on disk'.format(id))
+    fname = '/var/db/DispatchBuddy/evdata/{}.pcl'.format(id)
+    try:
+        with open(fname, 'wb') as f:
+            f.write(payload)
+        logger.debug('{}.pcl stored on disk'.format(id))
 
-        except Exception as e:
-            logger.warning('failed to store event data on disk: {}'.format(e))
-            logger.warning('uid:{}, euid:{}, gid:{}, egid:{}'.format(os.getuid(), os.geteuid(), os.getgid(), os.getegid()))
+    except Exception as e:
+        logger.warning('failed to store event data on disk: {}'.format(e))
+        logger.warning('uid:{}, euid:{}, gid:{}, egid:{}'.format(os.getuid(), os.geteuid(), os.getgid(), os.getegid()))
 
-        args = {'case_number'      :ev['case_number'],
-                'dispatch_station' :'',
-                'response_station' :'',
-                'event_ts'         :ev['isotimestamp'],
-                'insert_ts'        :'now()',
-                'ev_type'          :ev['msgtype'],
-                'priority'         :'',
-                'address'          :ev['address'],
-                'description'      :ev['notes'],
-                'units'            :ev['units'],
-                'caller'           :'',
-                'name'             :ev['business'],
-                'ev_uuid'          :id,
-                'nature'           :ev['nature'],
-                'cross_streets'    :ev['cross'],
-                'city'             :ev['city'],
-               }
+    args = {'case_number'      :ev['case_number'],
+            'dispatch_station' :'',
+            'response_station' :'',
+            'event_ts'         :ev['isotimestamp'],
+            'insert_ts'        :'now()',
+            'ev_type'          :ev['msgtype'],
+            'priority'         :'',
+            'address'          :ev['address'],
+            'description'      :ev['notes'],
+            'units'            :ev['units'],
+            'caller'           :'',
+            'name'             :ev['business'],
+            'ev_uuid'          :id,
+            'nature'           :ev['nature'],
+            'cross_streets'    :ev['cross'],
+            'city'             :ev['city'],
+           }
 
-        try:
-            DB.store_event(args)
-        except Exception as e:
-            logger.warning('failed to store event in DB: {}'.format(e))
+    try:
+        DB.store_event(args)
+    except Exception as e:
+        logger.warning('failed to store event in BlueLabs DB: {}'.format(e))
+
+    try:
+        firebase_db.child('dispatches').push(dict(ev._asdict), token=firebase_user['idToken'])
+    except Exception as e:
+        logger.warning('failed to store event in Firebase: {}'.format(e))
 
 
 def unique_message(ev):
-        hashdata = ''
-        for p in ('nature','notes','cross','address','units'):
-            hashdata += getattr(ev, p, '')
+    hashdata = ''
+    for p in ('nature','notes','cross','address','units'):
+        hashdata += getattr(ev, p, '')
 
-        logger.debug('hash on {!r}'.format(hashdata))
+    logger.debug('hash on {!r}'.format(hashdata))
 
-        hashdata = bytes(hashdata, encoding='utf-8')
-        hash     = hashlib.md5(hashdata).hexdigest()
-        now      = datetime.datetime.now()
+    hashdata = bytes(hashdata, encoding='utf-8')
+    hash     = hashlib.md5(hashdata).hexdigest()
+    now      = datetime.datetime.now()
 
-        DB.expire_event_hashes()
+    DB.expire_event_hashes()
 
-        try:
-            DB.add_event_hash(hash,now)
+    try:
+        DB.add_event_hash(hash,now)
 
-        except psycopg2.IntegrityError as e:
-            if hasattr(e, 'pgcode') and e.pgcode == '23505': # duplicate key error
-                logger.warning('Duplicate event within last 5 minutes discarded')
-                return False
-            logger.error('unexpected psycopg2 error: {} {}'.format(e.pgcode, e))
+    except psycopg2.IntegrityError as e:
+        if hasattr(e, 'pgcode') and e.pgcode == '23505': # duplicate key error
+            logger.warning('Duplicate event within last 5 minutes discarded')
+            return False
+        logger.error('unexpected psycopg2 error: {} {}'.format(e.pgcode, e))
 
-        except Exception as e:
-            # any other error such as DB not online and so on, will be ignored as it is
-            # more important to resend a duplicate than to fail to send a dispatch
-            logger.error('Failed to check DB for duplicates: {}'.format(e))
+    except Exception as e:
+        # any other error such as DB not online and so on, will be ignored as it is
+        # more important to resend a duplicate than to fail to send a dispatch
+        logger.error('Failed to check DB for duplicates: {}'.format(e))
 
 
 @app.task
