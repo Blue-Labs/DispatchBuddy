@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "140492930787",
+    "firebase_url": "https://dispatchbuddy-ca126.firebaseio.com",
+    "project_id": "dispatchbuddy-ca126",
+    "storage_bucket": "dispatchbuddy-ca126.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:140492930787:android:919779e890ddb134",
+        "android_client_info": {
+          "package_name": "org.fireground.dispatchbuddy"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "140492930787-2ilet9dihg15luf2lcufl827o33ocl04.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "org.fireground.dispatchbuddy",
+            "certificate_hash": "536ff05f11758469c3d765121c4410b55d0495f6"
+          }
+        },
+        {
+          "client_id": "140492930787-mhrqqis6k7g8e2lovcdui8fnt0pbcvuk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOlLYVJrOI4bjuk2smkfFLMLZRMXGqx7A"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "140492930787-mhrqqis6k7g8e2lovcdui8fnt0pbcvuk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
