@@ -115,7 +115,10 @@ def start_process_init_db(*args, **kwargs):
 
     firebase = pyrebase.initialize_app(config['Firebase'])
     auth = firebase.auth()
-    firebase_user = auth.sign_in_with_email_and_password(config['Firebase']['username'], config['Firebase']['password'])
+    try:
+        firebase_user = auth.sign_in_with_email_and_password(config['Firebase']['username'], config['Firebase']['password'])
+    except:
+        logger.error('Failed to login to Firebase: {}'.format(e))
     firebase_db = firebase.database()
 
 
