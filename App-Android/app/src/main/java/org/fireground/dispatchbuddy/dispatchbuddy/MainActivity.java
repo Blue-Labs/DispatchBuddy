@@ -1,29 +1,17 @@
 package org.fireground.dispatchbuddy.dispatchbuddy;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 import android.support.v7.widget.Toolbar;
 
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
 
 /**
  * Created by david on 2/9/18.
@@ -33,6 +21,9 @@ public class MainActivity extends AppCompatActivity {
     private FirebaseAuth mAuth;
     public FirebaseUser user = null;
 
+    // track Firebase here so we don't try to init it twice
+    private static FirebaseDatabase fbDatabase;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -41,34 +32,25 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.app_bar);
         setSupportActionBar(toolbar);
 
+        // wtf Firebase, local cache is readable even without authentication??
+        if (fbDatabase == null) {
+            fbDatabase = FirebaseDatabase.getInstance();
+            fbDatabase.setPersistenceEnabled(false);
+            fbDatabase.getReference("dispatches").keepSynced(false);
+        }
+
         mAuth = FirebaseAuth.getInstance();
+        Log.w("fucknut", "pre-login user: "+mAuth.getCurrentUser());
         startActivity(new Intent(this, LoginActivity.class));
         user = mAuth.getCurrentUser();
         if (user!=null) {
             Log.w("fucknut", "nutfucking delicious:> "+user.getEmail());
+            startActivity(new Intent(this, DispatchesActivity.class));
+        } else {
+            finish();
+            Log.w("fucknut", "no user involved yet");
+            return;
         }
-
-        // force refresh
-        FirebaseDatabase database = FirebaseDatabase.getInstance();
-
-        //bubs = database.getReference("").child("dispatches").limitToLast(10);
-
-        database.getReference("dispatches").addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                // This method is called once with the initial value and again
-                // whenever data at this location is updated.
-                for (DataSnapshot foo: dataSnapshot.getChildren()) {
-                    Log.w("wtf", "child foo: " + foo.getKey());
-                }
-            }
-
-            @Override
-            public void onCancelled(DatabaseError error) {
-                // Failed to read value
-                Log.w("wtf", "Failed to read value.", error.toException());
-            }
-        });
 
 
     }
@@ -89,7 +71,7 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(this, LoginActivity.class));
                 break;
             case R.id.appSettings:
-                //Intent intent = new Intent(this, SettingsActivity.class);
+                //Intent intent = new Intent(this, xSettingsActivity.class);
                 //startActivity(intent);
                 //break;
             case R.id.appSearch:
