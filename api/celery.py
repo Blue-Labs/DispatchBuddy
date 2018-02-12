@@ -228,7 +228,8 @@ def store_event(id, payload, ev):
         logger.warning('failed to store event data on disk: {}'.format(e))
         logger.warning('uid:{}, euid:{}, gid:{}, egid:{}'.format(os.getuid(), os.geteuid(), os.getgid(), os.getegid()))
 
-    args = {'case_number'      :ev['case_number'],
+    args = {'incident_number'  :ev['incident_number'],
+            'report_number'    :ev['report_number'],
             'dispatch_station' :'',
             'response_station' :'',
             'event_ts'         :ev['isotimestamp'],
