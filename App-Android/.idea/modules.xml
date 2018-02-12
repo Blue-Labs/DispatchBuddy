@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/DispatchBuddy.iml" filepath="$PROJECT_DIR$/DispatchBuddy.iml" />
+      <module fileurl="file://$USER_HOME$/Desktop/Projects/DispatchBuddy/App-Android/App-Android.iml" filepath="$USER_HOME$/Desktop/Projects/DispatchBuddy/App-Android/App-Android.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>
   </component>
