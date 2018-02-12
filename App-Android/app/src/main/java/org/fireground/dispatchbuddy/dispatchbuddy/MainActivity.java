@@ -15,6 +15,13 @@ import com.google.firebase.database.FirebaseDatabase;
 
 /**
  * Created by david on 2/9/18.
+ *
+ * TODO: ask user for priority permissions to emit alert sounds even when DND is on
+ * TODO: make dispatch noise for notification alert
+ * TODO: make icons for notifications
+ * TODO: make a general DispatchBuddy icon
+ * TODO: on authentication, did the DB app just go away?
+ * TODO: hitting the return arrow from the Dispatches activity takes us back to a blank main activity
  */
 
 public class MainActivity extends AppCompatActivity {
