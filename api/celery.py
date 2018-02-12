@@ -108,7 +108,7 @@ def start_process_init_db(*args, **kwargs):
     # DB instance so we don't have conflicting network connections. each task is a
     # separate Linux process. simple variables can be shared via app(), those such as
     # network connections, must never be shared
-    global DB, firebase_user, firebase_db
+    global DB, firebase_user, firebase_db, firebase_user_authtime
     DB = Database(config)
     logger.info('starting worker process, DB is {}, DB.conn is {}'.format(DB, DB.conn))
     logger.info('\x1b[1;34mprocess_init({}, {}) {!r}\x1b[0m'.format(os.getpid(), args, kwargs))
@@ -117,6 +117,7 @@ def start_process_init_db(*args, **kwargs):
     auth = firebase.auth()
     try:
         firebase_user = auth.sign_in_with_email_and_password(config['Firebase']['username'], config['Firebase']['password'])
+        firebase_user_authtime = datetime.datetime.utcnow()
     except:
         logger.error('Failed to login to Firebase: {}'.format(e))
     firebase_db = firebase.database()
@@ -252,8 +253,16 @@ def store_event(id, payload, ev):
     except Exception as e:
         logger.warning('failed to store event in BlueLabs DB: {}'.format(e))
 
+    if (datetime.datetime.utcnow() - firebase_user_authtime).total_seconds() > 3600:
+        auth = firebase.auth()
+        try:
+            firebase_user = auth.sign_in_with_email_and_password(config['Firebase']['username'], config['Firebase']['password'])
+            firebase_user_authtime = datetime.datetime.utcnow()
+        except:
+            logger.error('Failed to login to Firebase: {}'.format(e))
+
     try:
-        firebase_db.child('dispatches').push(dict(ev._asdict), token=firebase_user['idToken'])
+        firebase_db.child('dispatches').push(dict(ev), token=firebase_user['idToken'])
     except Exception as e:
         logger.warning('failed to store event in Firebase: {}'.format(e))
 
