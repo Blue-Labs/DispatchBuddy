@@ -253,7 +253,7 @@ def store_event(id, payload, ev):
     except Exception as e:
         logger.warning('failed to store event in BlueLabs DB: {}'.format(e))
 
-    if (datetime.datetime.utcnow() - firebase_user_authtime).total_seconds() > 3600:
+    if (datetime.datetime.utcnow() - firebase_user_authtime).total_seconds() > 3540:
         auth = firebase.auth()
         try:
             firebase_user = auth.sign_in_with_email_and_password(config['Firebase']['username'], config['Firebase']['password'])
