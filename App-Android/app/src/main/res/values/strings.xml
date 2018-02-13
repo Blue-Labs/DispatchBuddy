@@ -18,4 +18,14 @@
 
     <string name="notification_channel_name">DispatchBuddy</string>
     <string name="notification_channel_description">db description</string>
+
+    <string name="button_launch_dispatches_activity">Dispatches</string>
+    <string name="button_launch_login_activity">Login</string>
+    <string name="i_am_responding_to_station">I am responding to station</string>
+    <string name="enroute_to_scene">Enroute to scene</string>
+    <string name="on_scene">On scene</string>
+    <string name="clear_scene">Clear scene</string>
+    <string name="in_station">In Quarters</string>
+
+    <string name="google_android_map_api_key">AIzaSyDtAu5MPWgMbzjbsK11WrhjOBbjYL5gtXg</string>
 </resources>
