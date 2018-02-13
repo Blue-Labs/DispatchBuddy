@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8sp"
+    android:background="@drawable/dispatch_itemview_border">
+
+
+    <ImageView
+        android:id="@+id/scenario_type"
+        android:layout_width="64sp"
+        android:layout_height="64sp"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/scenario_type"
+        android:maxHeight="64sp"
+        android:maxWidth="64sp"
+        android:minHeight="64sp"
+        android:minWidth="64sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/timestamp"
+        android:layout_width="64sp"
+        android:layout_height="0dp"
+        android:textSize="13sp"
+        app:layout_constraintBottom_toTopOf="@id/nature"
+        app:layout_constraintStart_toEndOf="@id/address"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/address"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:maxHeight="26sp"
+        android:minHeight="26sp"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toStartOf="@id/timestamp"
+
+        app:layout_constraintHorizontal_bias="0"
+        app:layout_constraintStart_toEndOf="@id/scenario_type"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/cross"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:maxHeight="14sp"
+        android:minHeight="14sp"
+        android:textColor="@color/colorPrimaryDark"
+        android:textSize="10sp"
+
+        app:layout_constraintEnd_toStartOf="@id/timestamp"
+        app:layout_constraintHeight_max="6sp"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintVertical_bias="1.0"
+        app:layout_constraintStart_toEndOf="@id/scenario_type"
+        app:layout_constraintTop_toBottomOf="@id/address" />
+
+    <TextView
+        android:id="@+id/nature"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:maxHeight="22sp"
+        android:minHeight="22sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toEndOf="@+id/scenario_type"
+        app:layout_constraintTop_toBottomOf="@+id/cross" />
+
+</android.support.constraint.ConstraintLayout>
