@@ -13,6 +13,26 @@
         layout="@layout/app_bar">
     </include>
 
+    <Button
+        android:id="@+id/doLogin"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/button_launch_login_activity"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/doDispatches"
+        app:layout_constraintBottom_toBottomOf="parent"
+        />
+
+    <Button
+        android:id="@+id/doDispatches"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/button_launch_dispatches_activity"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/doLogin"
+        app:layout_constraintBottom_toBottomOf="parent"
+        />
+
 
 
 </android.support.constraint.ConstraintLayout>
