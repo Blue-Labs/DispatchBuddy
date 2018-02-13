@@ -1,6 +1,7 @@
 package org.fireground.dispatchbuddy.dispatchbuddy;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
@@ -103,6 +104,7 @@ public class LoginActivity extends Activity {
             mEmailField.setText(null);
             mPasswordField.setText(null);
             finish();
+            startActivity(new Intent(LoginActivity.this, DispatchesActivity.class));
         } else {
             //setContentView(R.layout.login);
             //findViewById(R.id.email_password_buttons).setVisibility(View.VISIBLE);
