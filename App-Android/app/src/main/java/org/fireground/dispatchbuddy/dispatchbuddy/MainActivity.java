@@ -6,6 +6,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
 import android.support.v7.widget.Toolbar;
 
@@ -45,6 +47,22 @@ public class MainActivity extends AppCompatActivity {
             fbDatabase.setPersistenceEnabled(false);
             fbDatabase.getReference("dispatches").keepSynced(false);
         }
+
+        Button doLogin = (Button) findViewById(R.id.doLogin);
+        doLogin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(MainActivity.this, LoginActivity.class));
+            }
+        });
+
+        Button doDispatches = (Button) findViewById(R.id.doDispatches);
+        doDispatches.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(MainActivity.this, DispatchesActivity.class));
+            }
+        });
 
         mAuth = FirebaseAuth.getInstance();
         Log.w("fucknut", "pre-login user: "+mAuth.getCurrentUser());
