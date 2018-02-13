@@ -143,7 +143,7 @@ public class DispatchesActivity extends AppCompatActivity {
             public void onChildChanged(DataSnapshot dataSnapshot, String s) {
                 DispatchStatusModel model = dataSnapshot.getValue(DispatchStatusModel.class);
                 if (model != null) {
-                    int index = getItemIndex(model);
+                    int index = getStatusItemIndex(model);
                     dispatch_statuses.set(index, model);
                     // update the dialog
                     DispatchStatusAdapter.updateDialogFromModel(model);
@@ -184,7 +184,7 @@ public class DispatchesActivity extends AppCompatActivity {
             public void onChildChanged(DataSnapshot dataSnapshot, String s) {
                 DispatchModel model = dataSnapshot.getValue(DispatchModel.class);
 
-                int index = getItemIndex(model);
+                int index = getDispatchItemIndex(model);
 
                 dispatches.set(index, model);
                 adapter.notifyItemChanged(index);
@@ -194,7 +194,7 @@ public class DispatchesActivity extends AppCompatActivity {
             public void onChildRemoved(DataSnapshot dataSnapshot) {
                 DispatchModel model = dataSnapshot.getValue(DispatchModel.class);
 
-                int index = getItemIndex(model);
+                int index = getDispatchItemIndex(model);
 
                 dispatches.remove(index);
                 adapter.notifyItemRemoved(index);
@@ -213,11 +213,24 @@ public class DispatchesActivity extends AppCompatActivity {
         });
     }
 
-    private int getItemIndex(DispatchModel dispatch) {
+    private int getDispatchItemIndex(DispatchModel dispatch) {
         int index = -1;
 
         for (int i=0; i<dispatches.size(); i++) {
             if (dispatches.get(i).isotimestamp.equals(dispatch.isotimestamp)) {
+                index = i;
+                break;
+            }
+        }
+
+        return index;
+    }
+
+    private int getStatusItemIndex(DispatchStatusModel model) {
+        int index = -1;
+
+        for (int i=0; i<dispatch_statuses.size(); i++) {
+            if (dispatch_statuses.get(i).getKey().equals(model.key)) {
                 index = i;
                 break;
             }
