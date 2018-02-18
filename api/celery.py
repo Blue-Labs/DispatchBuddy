@@ -101,6 +101,10 @@ def start_worker_init_db(**kwargs):
     # logging will show up in journalctl until MainProcess gets going
     logger.info('\x1b[1;35mworker_init({}) {!r}\x1b[0m'.format(os.getpid(), kwargs))
 
+firebase=None
+firebase_user=None
+firebase_db=None
+firebase_user_authtime=0
 
 @worker_process_init.connect()
 def start_process_init_db(*args, **kwargs):
@@ -108,8 +112,12 @@ def start_process_init_db(*args, **kwargs):
     # DB instance so we don't have conflicting network connections. each task is a
     # separate Linux process. simple variables can be shared via app(), those such as
     # network connections, must never be shared
-    global DB, firebase_user, firebase_db, firebase_user_authtime
+    global DB, firebase, firebase_user, firebase_db, firebase_user_authtime
     DB = Database(config)
+    firebase_user=None
+    firebase_db=None
+    firebase_user_authtime=0
+
     logger.info('starting worker process, DB is {}, DB.conn is {}'.format(DB, DB.conn))
     logger.info('\x1b[1;34mprocess_init({}, {}) {!r}\x1b[0m'.format(os.getpid(), args, kwargs))
 
@@ -118,6 +126,7 @@ def start_process_init_db(*args, **kwargs):
     try:
         firebase_user = auth.sign_in_with_email_and_password(config['Firebase']['username'], config['Firebase']['password'])
         firebase_user_authtime = datetime.datetime.utcnow()
+        logger.info('Logged into Firebase');
     except:
         logger.error('Failed to login to Firebase: {}'.format(e))
     firebase_db = firebase.database()
@@ -191,8 +200,6 @@ def dispatch_job(self, id, payload):
         logger.debug('incorrect prelude, ignoring')
         return
 
-    # if no parser has been imported, an exception will happen here
-
     parser = Parser(logger, id)
     parser.load(data=payload)
     ev = parser.parse()
@@ -219,6 +226,9 @@ def dispatch_job(self, id, payload):
 
 
 def store_event(id, payload, ev):
+    # todo: why do these need specifying as global, but DB doesn't?
+    global firebase, firebase_user, firebase_db, firebase_user_authtime
+
     fname = '/var/db/DispatchBuddy/evdata/{}.pcl'.format(id)
     try:
         with open(fname, 'wb') as f:
@@ -253,12 +263,12 @@ def store_event(id, payload, ev):
     except Exception as e:
         logger.warning('failed to store event in BlueLabs DB: {}'.format(e))
 
-    if (datetime.datetime.utcnow() - firebase_user_authtime).total_seconds() > 3540:
-        auth = firebase.auth()
-        try:
+    try:
+        if (datetime.datetime.utcnow() - firebase_user_authtime).total_seconds() > 3540:
+            auth = firebase.auth()
             firebase_user = auth.sign_in_with_email_and_password(config['Firebase']['username'], config['Firebase']['password'])
             firebase_user_authtime = datetime.datetime.utcnow()
-        except:
+    except:
             logger.error('Failed to login to Firebase: {}'.format(e))
 
     try:
