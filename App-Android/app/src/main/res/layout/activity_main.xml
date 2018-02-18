@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/gradient_darkblue"
     android:fitsSystemWindows="true"
-    tools:context="org.fireground.dispatchbuddy.dispatchbuddy.MainActivity">
+    tools:context="org.fireground.dispatchbuddy.MainActivity">
 
     <include
         android:id="@+id/app_bar"
