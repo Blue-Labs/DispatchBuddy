@@ -7,6 +7,12 @@
     android:layout_marginBottom="8sp"
     android:background="@drawable/dispatch_itemview_border">
 
+    <TextView
+        android:id="@+id/firebaseKey"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <ImageView
         android:id="@+id/scenario_type"
@@ -69,9 +75,29 @@
         android:layout_height="wrap_content"
         android:maxHeight="22sp"
         android:minHeight="22sp"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/respondingPersonnelIcon"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toEndOf="@+id/scenario_type"
         app:layout_constraintTop_toBottomOf="@+id/cross" />
+
+    <ImageView
+        android:id="@+id/respondingPersonnelIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
+        android:contentDescription="@string/personnel_count"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/respondingPersonnelCount"
+        app:layout_constraintStart_toEndOf="@id/nature"
+        app:layout_constraintTop_toBottomOf="@id/timestamp"
+        app:srcCompat="@drawable/ic_person_black_24dp" />
+
+    <TextView
+        android:id="@+id/respondingPersonnelCount"
+        android:layout_width="20dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/respondingPersonnelIcon"
+        app:layout_constraintTop_toBottomOf="@id/timestamp" />
 
 </android.support.constraint.ConstraintLayout>
