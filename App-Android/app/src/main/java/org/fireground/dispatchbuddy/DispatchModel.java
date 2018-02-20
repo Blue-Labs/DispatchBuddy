@@ -1,7 +1,5 @@
 package org.fireground.dispatchbuddy;
 
-import android.util.Log;
-
 import com.google.firebase.database.IgnoreExtraProperties;
 
 import java.util.HashMap;

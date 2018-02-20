@@ -12,19 +12,12 @@ import android.view.View;
 import android.widget.CheckedTextView;
 import android.widget.TextView;
 
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
-
-import org.fireground.dispatchbuddy.DispatchModel;
-import org.fireground.dispatchbuddy.DispatchStatusAdapter;
-import org.fireground.dispatchbuddy.DispatchStatusModel;
-import org.fireground.dispatchbuddy.NotificationUtils;
-import org.fireground.dispatchbuddy.R;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,10 +30,9 @@ import java.util.List;
  */
 
 public class DispatchesActivity extends AppCompatActivity {
-    final private String TAG = "ACA";
-    private static FirebaseDatabase fbDatabase;
-    private FirebaseAuth mAuth;
-    private DatabaseReference reference;
+    final private String TAG = "DA";
+    private FirebaseAdapter FBA;
+
     Query ordered_dispatches_query;
     Query dispatch_status_query;
 
@@ -48,6 +40,7 @@ public class DispatchesActivity extends AppCompatActivity {
     private List<DispatchModel> dispatches;
     public static List<DispatchStatusModel> dispatch_statuses;
     private DispatchAdapter adapter;
+    private DispatchStatusAdapter statusAdapter;
 
     private TextView emptyText;
     private NotificationUtils mNotificationUtils;
@@ -65,11 +58,14 @@ public class DispatchesActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         mNotificationUtils = new NotificationUtils(this);
+        FBA = new FirebaseAdapter(this);
+        Log.i(TAG, "startup with FBA user: "+FBA.getUser());
 
-        fbDatabase = FirebaseDatabase.getInstance();
-        reference = fbDatabase.getReference();
-        ordered_dispatches_query = reference.child("dispatches").orderByChild("isotimestamp").limitToLast(startupCount);
-        dispatch_status_query = reference.child("dispatch-status");
+        // subscribe to data-notifications
+        FBA.subscribeChannel("dispatches");
+
+        ordered_dispatches_query = FBA.getTopPathRef("/dispatches").orderByChild("isotimestamp").limitToLast(startupCount);
+        dispatch_status_query    = FBA.getTopPathRef("/dispatch-status");
 
         emptyText = (TextView) findViewById(R.id.text_no_data);
 
@@ -103,6 +99,8 @@ public class DispatchesActivity extends AppCompatActivity {
             }
         });
 
+        statusAdapter = new DispatchStatusAdapter(this);
+
         recyclerView.setAdapter(adapter);
 
         setListeners();
@@ -110,29 +108,12 @@ public class DispatchesActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
-
-        mAuth = FirebaseAuth.getInstance();
-        if (mAuth == null) {
-            //Log.d(TAG, "no user, exit dispatches onStart please");
-            DispatchesActivity.this.finish();
-        }
-
-        //Log.d(TAG, "still in dispatches onStart");
-    }
-
-    @Override
     public void onResume() {
         super.onResume();
 
-        mAuth = FirebaseAuth.getInstance();
-        if (mAuth == null) {
-            //Log.d(TAG, "no user, exit dispatches onResume please");
+        if (FBA.getUser() == null) {
             DispatchesActivity.this.finish();
         }
-
-        //Log.d(TAG, "still in dispatches onResume");
     }
 
     private void setListeners() {
@@ -155,7 +136,7 @@ public class DispatchesActivity extends AppCompatActivity {
                     dispatch_statuses.add(model);
 
                     // update the dialog
-                    DispatchStatusAdapter.updateDialogFromModel(model);
+                    statusAdapter.updateDialogFromModel(model);
                 }
             }
 
@@ -175,7 +156,7 @@ public class DispatchesActivity extends AppCompatActivity {
 
 
                     // update the dialog
-                    DispatchStatusAdapter.updateDialogFromModel(model);
+                    statusAdapter.updateDialogFromModel(model);
                 }
             }
 
@@ -354,7 +335,7 @@ public class DispatchesActivity extends AppCompatActivity {
 
         // set checkboxes when we build the dialog interface, must be done
         // after .show() obviously
-        DispatchStatusAdapter.updateDialogFromModel(dispatch.getKey());
+        statusAdapter.updateDialogFromModel(dispatch.getKey());
 
         final CheckedTextView mRespondingToStation = (CheckedTextView) dispatchLongpressDialog.findViewById(R.id.responding_to_station);
         final CheckedTextView mEnroute = (CheckedTextView) dispatchLongpressDialog.findViewById(R.id.enroute);
@@ -371,7 +352,7 @@ public class DispatchesActivity extends AppCompatActivity {
                     mRespondingToStation.setChecked(false);
                 }
                 // update our model
-                DispatchStatusAdapter.updateModelFromDialog(dispatchLongpressDialog);
+                statusAdapter.updateModelFromDialog(dispatchLongpressDialog);
             }
         });
 
@@ -384,7 +365,7 @@ public class DispatchesActivity extends AppCompatActivity {
                     mEnroute.setChecked(false);
                 }
                 // update our model
-                DispatchStatusAdapter.updateModelFromDialog(dispatchLongpressDialog);
+                statusAdapter.updateModelFromDialog(dispatchLongpressDialog);
             }
         });
 
@@ -397,7 +378,7 @@ public class DispatchesActivity extends AppCompatActivity {
                     mOnScene.setChecked(false);
                 }
                 // update our model
-                DispatchStatusAdapter.updateModelFromDialog(dispatchLongpressDialog);
+                statusAdapter.updateModelFromDialog(dispatchLongpressDialog);
             }
         });
 
@@ -410,7 +391,7 @@ public class DispatchesActivity extends AppCompatActivity {
                     mClearScene.setChecked(false);
                 }
                 // update our model
-                DispatchStatusAdapter.updateModelFromDialog(dispatchLongpressDialog);
+                statusAdapter.updateModelFromDialog(dispatchLongpressDialog);
             }
         });
 
@@ -424,7 +405,7 @@ public class DispatchesActivity extends AppCompatActivity {
                 }
                 // TODO: need logic to go backwards if user un-marks event
                 // update our model
-                DispatchStatusAdapter.updateModelFromDialog(dispatchLongpressDialog);
+                statusAdapter.updateModelFromDialog(dispatchLongpressDialog);
 
                 //dispatchLongpressDialog.hide();
             }

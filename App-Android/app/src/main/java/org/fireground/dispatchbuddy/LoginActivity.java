@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
@@ -12,107 +13,111 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.FirebaseAuthException;
 
-import org.fireground.dispatchbuddy.R;
+import java.lang.reflect.Method;
 
-/**
+/*
  * Created by david on 2/9/18.
  */
 
 public class LoginActivity extends Activity {
-    private static final String TAG = "Login";
-    private FirebaseAuth mAuth;
-    private FirebaseUser user = null;
+    private static final String TAG = "LoginActivity";
     private EditText mEmailField;
     private EditText mPasswordField;
+    public FirebaseAdapter FBA;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login);
 
-        // Views
+        FBA = new FirebaseAdapter(this);
+        Log.i(TAG, "FBA has been set to: "+FBA);
+
+        // View elements
         mEmailField = findViewById(R.id.firegroundUsername);
         mPasswordField = findViewById(R.id.firegroundPassword);
-        final Button loginBtn = findViewById(R.id.loginBtn);
 
         // Buttons
+        final Button loginBtn = findViewById(R.id.loginBtn);
         loginBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                int i = v.getId();
+                int which = v.getId();
                 ((InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE))
                         .toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, 0);
-                if (i == R.id.loginBtn) {
-                    signIn(mEmailField.getText().toString(), mPasswordField.getText().toString());
+                if (which == R.id.loginBtn) {
+                    signIn(FBA, mEmailField.getText().toString(), mPasswordField.getText().toString());
                 }
-
             }
         });
-
-        // [START initialize_auth]
-        mAuth = FirebaseAuth.getInstance();
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
+    public void onResume() {
+        super.onResume();
         // Check if user is signed in (non-null) and update UI accordingly.
-        user = mAuth.getCurrentUser();
-        updateUI(user);
+        if (FBA != null) {
+            updateUI(FBA.getUser());
+        }
     }
 
-    public FirebaseUser getUser() {
-        return user;
-    }
-
-    private void signIn(String email, String password) {
+    private void signIn(FirebaseAdapter FBA, String email, String password) {
+        // when called from onClick(), we don't have access to parent fields so FBA is passed to us
         if (!validateForm()) {
             return;
         }
 
-        mAuth.signInWithEmailAndPassword(email, password)
-                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+        final FirebaseAdapter _FBA = FBA;
+
+        // i don't know how to push the updateUI callback into this anonymous task
+        // so this has to stay here for now
+        FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener(new OnCompleteListener<AuthResult>() {
+                    String user;
                     @Override
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         if (task.isSuccessful()) {
-                            // Sign in success, update UI with the signed-in user's information
-                            user = mAuth.getCurrentUser();
+                            user = FirebaseAuth.getInstance().getCurrentUser().getEmail().toString();
+                            Log.e(TAG, "auth success");
                         } else {
-                            // If sign in fails, display a message to the user.
+                            user = null;
+                            Log.e(TAG, "auth failed");
                             Toast.makeText(LoginActivity.this, "Authentication failed.",
                                     Toast.LENGTH_SHORT).show();
-                            user = null;
                         }
                         updateUI(user);
                     }
+
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        if (e instanceof FirebaseAuthException) {
+                            //((FirebaseAuthException) e).getErrorCode());
+                            Toast.makeText(LoginActivity.this, e.getLocalizedMessage(),
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    }
                 });
-
     }
 
-    private void signOut() {
-        mAuth.signOut();
-        user = null;
-        updateUI(user);
-    }
-
-    private void updateUI(FirebaseUser user) {
+    private void updateUI(String user) {
+        Log.i(TAG, "updating UI with user: "+user);
         if (user != null) {
+            Log.i(TAG, "clearing fields, starting Dispatches Activity");
             mEmailField.setText(null);
             mPasswordField.setText(null);
             finish();
             startActivity(new Intent(LoginActivity.this, DispatchesActivity.class));
-        } else {
-            //setContentView(R.layout.login);
-            //findViewById(R.id.email_password_buttons).setVisibility(View.VISIBLE);
-            //findViewById(R.id.email_password_fields).setVisibility(View.VISIBLE);
-            //findViewById(R.id.signed_in_buttons).setVisibility(View.GONE);
         }
     }
+
     private boolean validateForm() {
         boolean valid = true;
 

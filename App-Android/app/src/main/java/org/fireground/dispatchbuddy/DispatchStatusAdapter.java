@@ -1,26 +1,17 @@
 package org.fireground.dispatchbuddy;
 
 import android.app.Dialog;
-import android.nfc.Tag;
+import android.content.Context;
 import android.util.Log;
 import android.widget.CheckedTextView;
 import android.widget.TextView;
 
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
-import org.fireground.dispatchbuddy.DispatchStatusModel;
-import org.fireground.dispatchbuddy.R;
-
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,11 +20,12 @@ import java.util.Map;
 
 public class DispatchStatusAdapter {
     private static final String TAG = "DSA";
+    private FirebaseAdapter FBA;
+    private Context context;
 
-    private List<DispatchStatusModel> list;
-
-    public DispatchStatusAdapter(List<DispatchStatusModel> list) {
-        this.list = list;
+    public DispatchStatusAdapter(Context context){
+        this.context = context;
+        FirebaseAdapter FBA = new FirebaseAdapter(context);
     }
 
     private static Boolean isLongPressDispatchDialogShowing() {
@@ -41,7 +33,7 @@ public class DispatchStatusAdapter {
         return dref != null;
     }
 
-    public static void updateModelFromDialog(Dialog d) {
+    public void updateModelFromDialog(Dialog d) {
         if (!isLongPressDispatchDialogShowing()) {
             return;
         }
@@ -68,14 +60,13 @@ public class DispatchStatusAdapter {
         final CheckedTextView mClearScene = (CheckedTextView) d.findViewById(R.id.clear_scene);
         final CheckedTextView mInQuarters = (CheckedTextView) d.findViewById(R.id.in_quarters);
 
-        final String person = FirebaseAuth.getInstance().getCurrentUser().getEmail();
-        final DatabaseReference ref = FirebaseDatabase.getInstance()
-                .getReference("dispatch-status")
+        final String person = FBA.getUser();
+        final DatabaseReference ref = FBA.getTopPathRef("dispatch-status")
                 .child(key)
                 .child("responding_personnel");
 
         if (!mResponding.isChecked()) {
-//            Log.i(TAG, "responder not checked");
+            Log.d(TAG, "responder un-checked");
             ref.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(DataSnapshot dataSnapshot) {
@@ -94,12 +85,13 @@ public class DispatchStatusAdapter {
                 }
             });
         } else {
-//            Log.i(TAG, "responder is checked");
+            Log.d(TAG, "responder is checked");
             ref.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(DataSnapshot dataSnapshot) {
                     Boolean found = false;
 
+                    // find existing member
                     for (DataSnapshot item : dataSnapshot.getChildren()) {
                         for (DataSnapshot e : item.getChildren()) {
                             if (e.getValue().equals(person)) {
@@ -111,7 +103,6 @@ public class DispatchStatusAdapter {
                             break;
                         }
                     }
-//                    Log.i("dsm", "responder found:"+found);
 
                     if (!found) {
                         // add to responders
@@ -122,11 +113,11 @@ public class DispatchStatusAdapter {
                         newRef.updateChildren(u, new DatabaseReference.CompletionListener() {
                             @Override
                             public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
-//                                if (databaseError != null) {
-//                                    Log.e(TAG,"Data could not be saved " + databaseError.getMessage());
-//                                } else {
-//                                    Log.e(TAG,"Data saved successfully.");
-//                                }
+                                if (databaseError != null) {
+                                    Log.e(TAG,"Data could not be saved " + databaseError.getMessage());
+                                } else {
+                                    Log.e(TAG,"Data saved successfully.");
+                                }
                             }
                         });
                     }
@@ -157,12 +148,12 @@ public class DispatchStatusAdapter {
         }
 
         // now that all our buttons are updated, update FB
-        FirebaseDatabase.getInstance().getReference("dispatch-status").child(key).setValue(model);
-        Log.i(TAG, "updating dispatch model's status for "+key);
-        FirebaseDatabase.getInstance().getReference("dispatches").child(key).child("event_status").setValue(status);
+        FBA.getTopPathRef("dispatch-status").child(key).setValue(model);
+        Log.d(TAG, "updating dispatch model's status for "+key);
+        FBA.getTopPathRef("dispatches").child(key).child("event_status").setValue(status);
     }
 
-    public static void updateDialogFromModel(String key) {
+    public void updateDialogFromModel(String key) {
         if (!isLongPressDispatchDialogShowing()) {
             return;
         }
@@ -208,7 +199,7 @@ public class DispatchStatusAdapter {
 //        }
 //    }
 
-    public static void updateDialogFromModel(DispatchStatusModel model) {
+    public void updateDialogFromModel(DispatchStatusModel model) {
         if (!isLongPressDispatchDialogShowing()) {
             return;
         }

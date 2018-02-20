@@ -7,10 +7,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.Manifest;
 import android.media.AudioManager;
-import android.os.Build;
 import android.os.Bundle;
+import android.os.Parcelable;
+import android.os.PowerManager;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.NotificationManagerCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
@@ -22,9 +22,9 @@ import android.support.v7.widget.Toolbar;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.FirebaseDatabase;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * Created by david on 2/9/18.
@@ -38,63 +38,63 @@ import com.google.firebase.database.FirebaseDatabase;
  */
 
 public class MainActivity extends AppCompatActivity {
+    private static Context context;
+    PowerManager powerManager;
+
     final private String TAG = "MAIN";
     private static final int ERROR_DIALOG_REQUEST=9001;
 
-    private FirebaseAuth mAuth;
-    public FirebaseUser user = null;
+    private static Boolean activityVisible = false;
 
-    // track Firebase here so we don't try to init it twice
-    private static FirebaseDatabase fbDatabase;
+    private FirebaseAdapter FBA;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        context = getApplicationContext();
+
+        // see https://stackoverflow.com/questions/6762671/how-to-lock-the-screen-of-an-android-device
+//        powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+//        PowerManager.WakeLock wl = manager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Your Tag");
+//        wl.acquire();
+//        wl.release();
+
+        // do this before setting contentview .. still not working -__-
+        windowAndPower.setWindowParameters(this);
+
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.app_bar);
         setSupportActionBar(toolbar);
 
+        FBA = new FirebaseAdapter(this);
+
         Log.i(TAG, "checking needed permissions");
         if (isServicesOK()) {
-            startDispatchBuddy();
-        }
-    }
+            Button doLogin = (Button) findViewById(R.id.doLogin);
+            doLogin.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    startActivity(new Intent(MainActivity.this, LoginActivity.class));
+                }
+            });
 
-    public void startDispatchBuddy() {
-        // wtf Firebase, local cache is readable even without authentication??
-        if (fbDatabase == null) {
-            fbDatabase = FirebaseDatabase.getInstance();
-            fbDatabase.setPersistenceEnabled(false);
-            fbDatabase.getReference("dispatches").keepSynced(false);
-        }
+            Button doDispatches = (Button) findViewById(R.id.doDispatches);
+            doDispatches.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    startActivity(new Intent(MainActivity.this, DispatchesActivity.class));
+                }
+            });
 
-        Button doLogin = (Button) findViewById(R.id.doLogin);
-        doLogin.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startActivity(new Intent(MainActivity.this, LoginActivity.class));
+            if (FBA.getUser()!=null) {
+                Log.i(TAG, "startup with FBA user: "+FBA.getUser());
+                Intent i = new Intent(this, DispatchesActivity.class);
+                startActivity(i);
+            } else {
+                Intent i = new Intent(this, LoginActivity.class);
+                startActivity(i);
             }
-        });
-
-        Button doDispatches = (Button) findViewById(R.id.doDispatches);
-        doDispatches.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startActivity(new Intent(MainActivity.this, DispatchesActivity.class));
-            }
-        });
-
-        mAuth = FirebaseAuth.getInstance();
-        user = mAuth.getCurrentUser();
-
-        startActivity(new Intent(this, LoginActivity.class));
-        user = mAuth.getCurrentUser();
-        if (user!=null) {
-//            Log.w(TAG, "logged in user: "+user.getEmail());
-        } else {
-//            Log.w(TAG, "no user involved yet");
-            return;
         }
     }
 
@@ -123,6 +123,7 @@ public class MainActivity extends AppCompatActivity {
 //            Log.w(TAG, "GPS, error occurred but we can fix it");
             Dialog dialog = GoogleApiAvailability.getInstance().getErrorDialog(MainActivity.this, available, ERROR_DIALOG_REQUEST);
             dialog.show();
+            GoogleApiAvailability.getInstance().makeGooglePlayServicesAvailable(this);
         } else {
             Toast.makeText(this, "Google API services not available, parts of DispatchBuddy won't work for you", Toast.LENGTH_SHORT).show();
         }
@@ -167,6 +168,50 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        activityVisible = true;
+        context = getApplicationContext();
+
+        // https://stackoverflow.com/questions/40259780/wake-up-device-programmatically
+//        KeyguardManager manager = (KeyguardManager) this.getSystemService(Context.KEYGUARD_SERVICE);
+//        KeyguardManager.KeyguardLock lock = manager.newKeyguardLock("abc");
+//        lock.disableKeyguard();
+
+        windowAndPower.setWindowParameters(this);
+        windowAndPower.unlockAndShowScreen(this);
+
+        if (getIntent()!=null) {
+            Bundle bundle = getIntent().getExtras();
+            if (bundle!= null) {
+                try {
+                    JSONObject object = new JSONObject(bundle.getString("data"));
+                    Log.i(TAG, "bundle data: "+object.toString());
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                Log.i(TAG, "extras is null");
+            }
+        } else {
+            Log.i(TAG, "getIntet() is null");
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        activityVisible = false;
+        context = null;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        activityVisible = false;
+        context = null;
+    }
+
+    public static Boolean isActivityVisible() {
+        return activityVisible;
     }
 
     @Override
@@ -240,7 +285,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_main, menu);
@@ -251,9 +295,7 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.appLogout:
-                user = mAuth.getCurrentUser();
-//                Log.w(TAG, "fb user is "+user.getEmail());
-                mAuth.signOut();
+                FBA.logOut();
                 startActivity(new Intent(this, LoginActivity.class));
                 break;
             case R.id.appSettings:
