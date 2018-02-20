@@ -50,19 +50,23 @@ public class NotificationUtils extends ContextWrapper {
                     .build();
 
             Uri alarmSound = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE
-                    + "://" + getPackageName() + "/raw/sm_dispatch.mp3");
+                    + "://" + getPackageName() + "raw/sm_dispatch.mp3");
 
             // Create the channel object with the unique ID MY_CHANNEL
             NotificationChannel myChannel =
                     new NotificationChannel(
                             ANDROID_CHANNEL_ID,
                             getResources().getString(R.string.app_name),
-                            NotificationManager.IMPORTANCE_MAX);
+                            NotificationManager.IMPORTANCE_HIGH); // maybe IMPORTANCE_MAX isn't allowed here?
 
             // Configure the channel's initial settings
             myChannel.enableLights(true);
             myChannel.enableVibration(true);
-            myChannel.setLightColor(Color.RED);
+            myChannel.setLightColor(0xffff0000);
+            myChannel.setBypassDnd(true);
+            myChannel.setShowBadge(true);
+            myChannel.setDescription("@string/app_name");
+            myChannel.setName("@string/app_name");
             myChannel.setVibrationPattern(vibrationScheme);
             myChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             myChannel.setSound(alarmSound, att);
@@ -97,8 +101,7 @@ public class NotificationUtils extends ContextWrapper {
         NotificationCompat.Builder n = new NotificationCompat.Builder(getApplicationContext(), ANDROID_CHANNEL_ID)
                 .setPriority(priority)
                 .setSmallIcon(R.mipmap.ic_dispatchbuddy_foreground)
-                .setLargeIcon(BitmapFactory.decodeResource(this.getResources(),
-                        R.mipmap.ic_launcher))
+                .setLargeIcon(BitmapFactory.decodeResource(this.getResources(), R.mipmap.ic_launcher))
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setContentTitle(title)
                 .setContentText(body)
@@ -149,6 +152,11 @@ public class NotificationUtils extends ContextWrapper {
         long getTime;
         getManager();
 
+        Log.d("sN:", "nature: "+nature);
+        Log.d("sN:", "priority: "+priority);
+        Log.d("sN:", "isotimestamp: "+isotimestamp);
+        Log.d("sN:", "groupSummary: "+groupSummary);
+
         Integer previousNotificationInterruptSetting=0;
         NotificationCompat.Builder nb = getNotificationBuilder(nature, address, priority, isotimestamp, groupSummary);
 
@@ -157,8 +165,8 @@ public class NotificationUtils extends ContextWrapper {
         int currentNotificationVolume = audio.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
         int maxVolume = audio.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION);
 
-        Log.w("tagus", "current mode is "+currentMode);
-        Log.w("tagus", "current Nvol is "+currentNotificationVolume);
+        Log.w("sN:", "current mode is "+currentMode);
+        Log.w("sN:", "current Nvol is "+currentNotificationVolume);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             previousNotificationInterruptSetting = mManager.getCurrentInterruptionFilter();
@@ -173,13 +181,13 @@ public class NotificationUtils extends ContextWrapper {
         try {
             getTime = sdf.parse(isotimestamp).getTime();
         } catch (ParseException e) {
-            Log.e("tagus", "failed to parse timestamp into a Date long"+e.getMessage());
+            Log.e("sN:", "failed to parse timestamp into a Date long"+e.getMessage());
             getTime = 101;
         }
 
 
         mManager.notify((int) getTime, nb.build());
-        Log.i("tagus", "notification emitted, group: "+isotimestamp);
+        Log.i("sN:", "notification emitted, group: "+isotimestamp);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             mManager.setInterruptionFilter(previousNotificationInterruptSetting);
@@ -191,17 +199,4 @@ public class NotificationUtils extends ContextWrapper {
         }
         audio.setStreamVolume(AudioManager.STREAM_NOTIFICATION, currentNotificationVolume, AudioManager.FLAG_PLAY_SOUND);
     }
-
-    /*public NotificationCompat.Builder getAndroidChannelNotification(String title, String body) {
-
-        NotificationCompat.Builder nb =
-                new NotificationCompat.Builder(getApplicationContext(), ANDROID_CHANNEL_ID)
-                .setContentTitle(title)
-                .setContentText(body)
-                .setSmallIcon(android.R.drawable.stat_sys_warning)
-                .setAutoCancel(true);
-
-        nb.setContentIntent(resultPendingIntent);
-        return nb;
-    }*/
 }
