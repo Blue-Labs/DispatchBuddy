@@ -30,4 +30,6 @@
 
     <string name="google_android_map_api_key">AIzaSyDtAu5MPWgMbzjbsK11WrhjOBbjYL5gtXg</string>
     <string name="personnel_count">Personnel count</string>
+
+    <string name="firebase_default_notification_channel">100</string>
 </resources>
