@@ -31,6 +31,7 @@ from celery.utils.log import get_task_logger
 
 from api.database import Database
 from api.messaging import Messaging
+from common.firebase import Firebase
 from memory_profiler import profile
 from parsers.pjl_lexmark import PCLParser as Parser
 
@@ -112,24 +113,12 @@ def start_process_init_db(*args, **kwargs):
     # DB instance so we don't have conflicting network connections. each task is a
     # separate Linux process. simple variables can be shared via app(), those such as
     # network connections, must never be shared
-    global DB, firebase, firebase_user, firebase_db, firebase_user_authtime
+    global DB, FB
     DB = Database(config)
-    firebase_user=None
-    firebase_db=None
-    firebase_user_authtime=0
+    FB = Firebase(logger, config)
 
     logger.info('starting worker process, DB is {}, DB.conn is {}'.format(DB, DB.conn))
     logger.info('\x1b[1;34mprocess_init({}, {}) {!r}\x1b[0m'.format(os.getpid(), args, kwargs))
-
-    firebase = pyrebase.initialize_app(config['Firebase'])
-    auth = firebase.auth()
-    try:
-        firebase_user = auth.sign_in_with_email_and_password(config['Firebase']['username'], config['Firebase']['password'])
-        firebase_user_authtime = datetime.datetime.utcnow()
-        logger.info('Logged into Firebase');
-    except:
-        logger.error('Failed to login to Firebase: {}'.format(e))
-    firebase_db = firebase.database()
 
 
 # shutdown the MainProcess DB (note; you won't see logging information from DB here.)
@@ -227,7 +216,6 @@ def dispatch_job(self, id, payload):
 
 def store_event(id, payload, ev):
     # todo: why do these need specifying as global, but DB doesn't?
-    global firebase, firebase_user, firebase_db, firebase_user_authtime
 
     fname = '/var/db/DispatchBuddy/evdata/{}.pcl'.format(id)
     try:
@@ -263,18 +251,8 @@ def store_event(id, payload, ev):
     except Exception as e:
         logger.warning('failed to store event in BlueLabs DB: {}'.format(e))
 
-    try:
-        if (datetime.datetime.utcnow() - firebase_user_authtime).total_seconds() > 3540:
-            auth = firebase.auth()
-            firebase_user = auth.sign_in_with_email_and_password(config['Firebase']['username'], config['Firebase']['password'])
-            firebase_user_authtime = datetime.datetime.utcnow()
-    except:
-            logger.error('Failed to login to Firebase: {}'.format(e))
-
-    try:
-        firebase_db.child('dispatches').push(dict(ev), token=firebase_user['idToken'])
-    except Exception as e:
-        logger.warning('failed to store event in Firebase: {}'.format(e))
+    # store the event data and generate a data-notification
+    FB.pushEventToFirebase(ev, id)
 
 
 def unique_message(ev):
