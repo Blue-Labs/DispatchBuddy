@@ -27,9 +27,14 @@
     <string name="on_scene">On scene</string>
     <string name="clear_scene">Clear scene</string>
     <string name="in_station">In Quarters</string>
-
-    <string name="google_android_map_api_key">AIzaSyDtAu5MPWgMbzjbsK11WrhjOBbjYL5gtXg</string>
     <string name="personnel_count">Personnel count</string>
 
+    <string name="google_android_map_api_key">AIzaSyARTZLL2K00VxoH1XkBv4YjeqWkznXXZho</string>
+    <string name="service_not_available">Google Maps service is not available</string>
+
+
     <string name="firebase_default_notification_channel">100</string>
+    <string name="invalid_lat_long_used">Invalid Lat/Lng used</string>
+    <string name="no_address_found">No address was found</string>
+    <string name="address_found">address found</string>
 </resources>

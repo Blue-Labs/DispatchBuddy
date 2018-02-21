@@ -5,15 +5,22 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
+    android:padding="8dp"
     android:id="@+id/relativeLayout">
 
+    <android.support.constraint.Guideline
+        android:id="@+id/guideline"
+        android:layout_width="1dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.5"/>
 
     <CheckedTextView
         android:id="@+id/responding_to_station"
         android:checkMark="?android:attr/listChoiceIndicatorMultiple"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
         android:text="@string/i_am_responding_to_station"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -22,7 +29,7 @@
     <com.google.android.gms.maps.MapView
         android:id="@+id/mapView"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="260dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/responding_to_station" />
@@ -38,49 +45,70 @@
 
     <CheckedTextView
         android:id="@+id/enroute"
-        android:checkMark="?android:attr/listChoiceIndicatorMultiple"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginEnd="1dp"
+        android:gravity="center_vertical"
+        android:paddingStart="6dp"
+        android:paddingEnd="0dp"
+        android:checkMark="?android:attr/listChoiceIndicatorMultiple"
         android:text="@string/enroute_to_scene"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:textSize="12sp"
+        android:background="@drawable/dispatch_itemview_border"
+        app:layout_constraintEnd_toStartOf="@id/guideline"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/divider"
         tools:ignore="NotSibling" />
 
     <CheckedTextView
         android:id="@+id/on_scene"
-        android:checkMark="?android:attr/listChoiceIndicatorMultiple"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginStart="1dp"
+        android:gravity="center_vertical"
+        android:paddingStart="6dp"
+        android:paddingEnd="0dp"
+        android:textSize="12sp"
+        android:checkMark="?android:attr/listChoiceIndicatorMultiple"
         android:text="@string/on_scene"
+        android:background="@drawable/dispatch_itemview_border"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/guideline"
+        app:layout_constraintTop_toBottomOf="@id/divider" />
+
+    <CheckedTextView
+        android:id="@+id/clear_scene"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="1dp"
+        android:gravity="center_vertical"
+        android:paddingStart="6dp"
+        android:paddingEnd="0dp"
+        android:textSize="12sp"
+        android:checkMark="?android:attr/listChoiceIndicatorMultiple"
+        android:text="@string/clear_scene"
+        android:background="@drawable/dispatch_itemview_border"
+        app:layout_constraintEnd_toStartOf="@id/guideline"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/enroute" />
 
     <CheckedTextView
-        android:id="@+id/clear_scene"
-        android:checkMark="?android:attr/listChoiceIndicatorMultiple"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/clear_scene"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/on_scene"
-        />
-
-    <CheckedTextView
         android:id="@+id/in_quarters"
-        android:checkMark="?android:attr/listChoiceIndicatorMultiple"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginStart="1dp"
+        android:gravity="center_vertical"
+        android:paddingStart="6dp"
+        android:paddingEnd="0dp"
+        android:textSize="12sp"
+        android:checkMark="?android:attr/listChoiceIndicatorMultiple"
         android:text="@string/in_station"
+        android:background="@drawable/dispatch_itemview_border"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/clear_scene" />
+        app:layout_constraintStart_toEndOf="@id/guideline"
+        app:layout_constraintTop_toBottomOf="@id/on_scene" />
 
     <TextView
         android:id="@+id/dispatchKey"
