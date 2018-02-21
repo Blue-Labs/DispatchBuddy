@@ -92,11 +92,11 @@ public class DispatchStatusModel {
 //        Log.i("DSM()", "set model responding_personnel:"+responding_personnel);
     }
 //    public void setResponding_personnel(String person, Boolean state) {
-//        Log.i("DSM(funkynut)", "set model responding_personnel with:"+person);
+//        Log.i("DSM()", "set model responding_personnel with:"+person);
 //        Boolean z = responding_personnel.containsValue(person);
-//        Log.i("DSM(funkynut)", "has person:"+z);
-//        Log.i("DSM(funkynut)", "values:"+ responding_personnel.values());
-//        Log.i("DSM(funkynut)", "keySet:"+ responding_personnel.keySet());
+//        Log.i("DSM()", "has person:"+z);
+//        Log.i("DSM()", "values:"+ responding_personnel.values());
+//        Log.i("DSM()", "keySet:"+ responding_personnel.keySet());
 //
 //        Map<String, RespondingPersonnel> rp = responding_personnel;
 //        if (!state) {

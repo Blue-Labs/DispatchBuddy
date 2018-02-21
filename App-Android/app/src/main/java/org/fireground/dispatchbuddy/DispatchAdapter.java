@@ -17,7 +17,7 @@ import java.util.List;
  * Created by david on 2/11/18.
  *
  * TODO: we'll have to move sort order into the client, the adapter/recyclerview isn't stuffing them in the middle when a new but older dispatch is inserted
- * TODO: autoscroll the recyclerview with new events
+ * TODO: autoscroll the recyclerview with new events/optional/maintain current position
  * TODO: don't push a notification during app startup, that's 10 billion notifications...
  */
 

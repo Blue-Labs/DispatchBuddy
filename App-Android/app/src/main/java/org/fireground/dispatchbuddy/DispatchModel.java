@@ -32,7 +32,7 @@ public class DispatchModel {
     public String gmapurl;
     public String gmapurldir;
     private int icon_scenario_type; // the image used for the overall scenario for this incident
-    private int icon_incident_state; // dispatched, en-route, on-scene, clear-of-scene
+    private int icon_incident_state; // dispatched, en-route, on-scene, clear-of-scene, in-quarters
     private String key; // Firebase created row key
 
     public DispatchModel() {}

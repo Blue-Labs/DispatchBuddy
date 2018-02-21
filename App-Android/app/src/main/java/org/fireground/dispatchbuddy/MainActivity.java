@@ -30,11 +30,19 @@ import org.json.JSONObject;
  * Created by david on 2/9/18.
  *
  * TODO: ask user for priority permissions to emit alert sounds even when DND is on
+ *       (done, but requires hitting return arrow)
  * TODO: make dispatch noise for notification alert
+ *       (still playing default sound, not mp3)
  * TODO: make icons for notifications
  * TODO: make a general DispatchBuddy icon
- * TODO: on authentication, did the DB app just go away?
- * TODO: hitting the return arrow from the Dispatches activity takes us back to a blank main activity
+ *
+ * notes:
+ *
+ * play store issues, refer to https://stackoverflow.com/questions/23108684/android-app-published-but-not-found-in-google-play
+ * resolved, alphas will NOT show up at the published URL, they show up only to a
+ * specific testing url, which is only found AFTER you publish and IF you have a
+ * list of testers defined.
+ *
  */
 
 public class MainActivity extends AppCompatActivity {
@@ -46,13 +54,18 @@ public class MainActivity extends AppCompatActivity {
 
     private static Boolean activityVisible = false;
 
-    private FirebaseAdapter FBA;
+    private DispatchBuddyBase DBB;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // do this before setting contentview .. still not working -__-
+        windowAndPower.setWindowParameters(this);
 
         context = getApplicationContext();
+        DBB = DispatchBuddyBase.getInstance();
+        DBB.setAppContext(this.getApplicationContext());
+        DBB.logjam();
 
         // see https://stackoverflow.com/questions/6762671/how-to-lock-the-screen-of-an-android-device
 //        powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -60,14 +73,9 @@ public class MainActivity extends AppCompatActivity {
 //        wl.acquire();
 //        wl.release();
 
-        // do this before setting contentview .. still not working -__-
-        windowAndPower.setWindowParameters(this);
-
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.app_bar);
         setSupportActionBar(toolbar);
-
-        FBA = new FirebaseAdapter(this);
 
         Log.i(TAG, "checking needed permissions");
         if (isServicesOK()) {
@@ -87,8 +95,10 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-            if (FBA.getUser()!=null) {
-                Log.i(TAG, "startup with FBA user: "+FBA.getUser());
+            if (DBB.getUser()!=null) {
+                Log.i(TAG, "startup with DBB user: "+DBB.getUser());
+                // pushing reg will happen 2x on Login, just deal with it until the singleton is finished
+                DBB.pushFirebaseClientRegistrationData(DBB.getRegToken());
                 Intent i = new Intent(this, DispatchesActivity.class);
                 startActivity(i);
             } else {
@@ -295,7 +305,7 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.appLogout:
-                FBA.logOut();
+                DBB.logOut();
                 startActivity(new Intent(this, LoginActivity.class));
                 break;
             case R.id.appSettings:

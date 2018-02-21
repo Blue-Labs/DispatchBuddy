@@ -20,12 +20,12 @@ import java.util.Map;
 
 public class DispatchStatusAdapter {
     private static final String TAG = "DSA";
-    private FirebaseAdapter FBA;
+    private DispatchBuddyBase DBB;
     private Context context;
 
     public DispatchStatusAdapter(Context context){
         this.context = context;
-        FirebaseAdapter FBA = new FirebaseAdapter(context);
+        DBB = DispatchBuddyBase.getInstance();
     }
 
     private static Boolean isLongPressDispatchDialogShowing() {
@@ -60,8 +60,8 @@ public class DispatchStatusAdapter {
         final CheckedTextView mClearScene = (CheckedTextView) d.findViewById(R.id.clear_scene);
         final CheckedTextView mInQuarters = (CheckedTextView) d.findViewById(R.id.in_quarters);
 
-        final String person = FBA.getUser();
-        final DatabaseReference ref = FBA.getTopPathRef("dispatch-status")
+        final String person = DBB.getUser();
+        final DatabaseReference ref = DBB.getTopPathRef("/dispatch-status")
                 .child(key)
                 .child("responding_personnel");
 
@@ -148,9 +148,9 @@ public class DispatchStatusAdapter {
         }
 
         // now that all our buttons are updated, update FB
-        FBA.getTopPathRef("dispatch-status").child(key).setValue(model);
+        DBB.getTopPathRef("/dispatch-status").child(key).setValue(model);
         Log.d(TAG, "updating dispatch model's status for "+key);
-        FBA.getTopPathRef("dispatches").child(key).child("event_status").setValue(status);
+        DBB.getTopPathRef("/dispatches").child(key).child("event_status").setValue(status);
     }
 
     public void updateDialogFromModel(String key) {
@@ -164,40 +164,6 @@ public class DispatchStatusAdapter {
             }
         }
     }
-
-//    public static void updateDialogFromModel(String key, String checkbox_name, Boolean state) {
-//        if (!isLongPressDispatchDialogShowing()) {
-//            return;
-//        }
-//
-//        int index = DispatchesActivity.dispatch_statuses.indexOf(key);
-//        for (DispatchStatusModel model: DispatchesActivity.dispatch_statuses) {
-//            if (model.getKey().equals(key)) {
-//                switch (checkbox_name) {
-//                    case "en_route":
-//                        model.setEn_route(state);
-//                        break;
-//                    case "on_scene":
-//                        model.setOn_scene(state);
-//                        break;
-//                    case "clear_scene":
-//                        model.setClear_scene(state);
-//                        break;
-//                    case "in_quarters":
-//                        model.setIn_quarters(state);
-//                        break;
-//                    case "responding_personnel":
-//                        Log.i("uDFM(knb)", "need to store the responding person");
-//                        break;
-//                    default:
-//                        Log.w("uDFM(knb)", "unknown key sent to updateCheckBox:"+key);
-//                        return;
-//                }
-//                updateDialogFromModel(model);
-//                break;
-//            }
-//        }
-//    }
 
     public void updateDialogFromModel(DispatchStatusModel model) {
         if (!isLongPressDispatchDialogShowing()) {

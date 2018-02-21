@@ -29,15 +29,14 @@ public class LoginActivity extends Activity {
     private static final String TAG = "LoginActivity";
     private EditText mEmailField;
     private EditText mPasswordField;
-    public FirebaseAdapter FBA;
+    public DispatchBuddyBase DBB;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login);
 
-        FBA = new FirebaseAdapter(this);
-        Log.i(TAG, "FBA has been set to: "+FBA);
+        DBB = DispatchBuddyBase.getInstance();
 
         // View elements
         mEmailField = findViewById(R.id.firegroundUsername);
@@ -52,7 +51,7 @@ public class LoginActivity extends Activity {
                 ((InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE))
                         .toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, 0);
                 if (which == R.id.loginBtn) {
-                    signIn(FBA, mEmailField.getText().toString(), mPasswordField.getText().toString());
+                    signIn(mEmailField.getText().toString(), mPasswordField.getText().toString());
                 }
             }
         });
@@ -62,18 +61,14 @@ public class LoginActivity extends Activity {
     public void onResume() {
         super.onResume();
         // Check if user is signed in (non-null) and update UI accordingly.
-        if (FBA != null) {
-            updateUI(FBA.getUser());
-        }
+        updateUI(DBB.getUser());
     }
 
-    private void signIn(FirebaseAdapter FBA, String email, String password) {
+    private void signIn(String email, String password) {
         // when called from onClick(), we don't have access to parent fields so FBA is passed to us
         if (!validateForm()) {
             return;
         }
-
-        final FirebaseAdapter _FBA = FBA;
 
         // i don't know how to push the updateUI callback into this anonymous task
         // so this has to stay here for now
@@ -83,8 +78,9 @@ public class LoginActivity extends Activity {
                     @Override
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         if (task.isSuccessful()) {
-                            user = FirebaseAuth.getInstance().getCurrentUser().getEmail().toString();
+                            user = DBB.getUser();
                             Log.e(TAG, "auth success");
+                            DBB.pushFirebaseClientRegistrationData(DBB.getRegToken());
                         } else {
                             user = null;
                             Log.e(TAG, "auth failed");
@@ -93,7 +89,6 @@ public class LoginActivity extends Activity {
                         }
                         updateUI(user);
                     }
-
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     @Override

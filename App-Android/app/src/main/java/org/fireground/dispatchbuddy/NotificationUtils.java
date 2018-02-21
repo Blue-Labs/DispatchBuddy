@@ -30,6 +30,7 @@ import java.text.SimpleDateFormat;
  */
 
 public class NotificationUtils extends ContextWrapper {
+    private String TAG = "NU";
     private NotificationManager mManager;
     private NotificationCompat.Builder nb;
     public static final String ANDROID_CHANNEL_ID = "com.fireground.org.org.fireground.dispatchbuddy.ANDROID";
@@ -41,7 +42,7 @@ public class NotificationUtils extends ContextWrapper {
         super(base);
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            Log.i("tagus", "creating a notification channel");
+            Log.i(TAG, "creating a notification channel");
 
             // todo: use atts for audio stream meta
             AudioAttributes att = new AudioAttributes.Builder()
@@ -114,15 +115,15 @@ public class NotificationUtils extends ContextWrapper {
         // TODO: bug, the S5 isn't showing the status update, it doesn't change the existing notification content
 
         if (groupSummary) {
-            Log.i("tagus", "setting groupSummary");
+            Log.i(TAG, "setting groupSummary");
             n.setGroupSummary(true);
             n.setShowWhen(true);
 
             if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
-                Log.i("tagus", "applying mp3 dispatch tone");
+                Log.i(TAG, "applying mp3 dispatch tone");
                 n.setSound(Uri.parse("android.resource://"+this.getPackageName()+"/"+R.raw.sm_dispatch));
             } else {
-                Log.i("tagus", "NOT applying mp3 dispatch tone");
+                Log.i(TAG, "NOT applying mp3 dispatch tone");
             }
         }
         n.setGroup(isotimestamp);
@@ -139,7 +140,7 @@ public class NotificationUtils extends ContextWrapper {
         if (mManager == null) {
             mManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (mManager == null) {
-                Log.e("tagus", "wtf, NO NOTIFICATION SERVICE??");
+                Log.e(TAG, "??, NO NOTIFICATION SERVICE??");
             }
         }
         return mManager;
