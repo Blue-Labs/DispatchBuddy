@@ -31,7 +31,7 @@ from celery.utils.log import get_task_logger
 
 from api.database import Database
 from api.messaging import Messaging
-from common.firebase import Firebase
+from api.firebase import Firebase
 from memory_profiler import profile
 from parsers.pjl_lexmark import PCLParser as Parser
 
@@ -252,7 +252,7 @@ def store_event(id, payload, ev):
         logger.warning('failed to store event in BlueLabs DB: {}'.format(e))
 
     # store the event data and generate a data-notification
-    FB.pushEventToFirebase(ev)
+    FB.pushEvent(ev)
 
 
 def unique_message(ev):
