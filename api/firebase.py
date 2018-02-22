@@ -68,7 +68,7 @@ class Firebase:
         return False
 
 
-    def pushEventToFirebase(self, ev):
+    def pushEvent(self, ev):
         try:
             if (datetime.datetime.utcnow() - self.firebase_user_authtime).total_seconds() > 3540:
                 auth = self.firebase.auth()
@@ -176,4 +176,4 @@ if __name__ == '__main__':
 
     logger.debug('Firebase startup')
     FB=Firebase(config, logger)
-    FB.pushEventToFirebase(ev)
+    FB.pushEvent(ev)

@@ -115,7 +115,7 @@ def start_process_init_db(*args, **kwargs):
     # network connections, must never be shared
     global DB, FB
     DB = Database(config)
-    FB = Firebase(logger, config)
+    FB = Firebase(config, logger)
 
     logger.info('starting worker process, DB is {}, DB.conn is {}'.format(DB, DB.conn))
     logger.info('\x1b[1;34mprocess_init({}, {}) {!r}\x1b[0m'.format(os.getpid(), args, kwargs))
@@ -252,7 +252,7 @@ def store_event(id, payload, ev):
         logger.warning('failed to store event in BlueLabs DB: {}'.format(e))
 
     # store the event data and generate a data-notification
-    FB.pushEventToFirebase(ev, id)
+    FB.pushEventToFirebase(ev)
 
 
 def unique_message(ev):
