@@ -48,11 +48,6 @@ public class DispatchStatusAdapter {
                 break;
             }
         }
-        if (model==null) {
-//            Log.w("uMFD(d)", "creating new model for key:"+key);
-            model = new DispatchStatusModel();
-            model.setKey(key);
-        }
 
         final CheckedTextView mResponding = (CheckedTextView) d.findViewById(R.id.responding_to_station);
         final CheckedTextView mEnroute = (CheckedTextView) d.findViewById(R.id.enroute);
@@ -66,7 +61,7 @@ public class DispatchStatusAdapter {
                 .child("responding_personnel");
 
         if (!mResponding.isChecked()) {
-            Log.d(TAG, "responder un-checked");
+            Log.d(TAG, person+" no longer marked as responding");
             ref.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(DataSnapshot dataSnapshot) {
@@ -85,7 +80,7 @@ public class DispatchStatusAdapter {
                 }
             });
         } else {
-            Log.d(TAG, "responder is checked");
+            Log.d(TAG, person+" marked as responding");
             ref.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(DataSnapshot dataSnapshot) {
@@ -114,9 +109,7 @@ public class DispatchStatusAdapter {
                             @Override
                             public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
                                 if (databaseError != null) {
-                                    Log.e(TAG,"Data could not be saved " + databaseError.getMessage());
-                                } else {
-                                    Log.e(TAG,"Data saved successfully.");
+                                    Log.e(TAG,person+" is responding, but could not be saved " + databaseError.getMessage());
                                 }
                             }
                         });
@@ -171,25 +164,39 @@ public class DispatchStatusAdapter {
         }
 
         if (model == null) {
-//            Log.w("uDFM(m)", "somehow we got a null model");
+            Log.e("uDFM(m)", "somehow we got a null model");
             return;
         }
 
-        Dialog dref = DispatchesActivity.dispatchLongpressDialog;
+        final Dialog dref = DispatchesActivity.dispatchLongpressDialog;
         if (dref.isShowing()) {
             final TextView dispatchKey = (TextView) dref.findViewById(R.id.dispatchKey);
             if (model.getKey().equals(dispatchKey.getText())) {
                 // TODO: set checkbox for responding
                 // TODO: clicking on alternate device with unmatched state, will react opposite as intended
+                final CheckedTextView mRespondingToStation = (CheckedTextView) dref.findViewById(R.id.responding_to_station);
                 final CheckedTextView mEnroute = (CheckedTextView) dref.findViewById(R.id.enroute);
                 final CheckedTextView mOnScene = (CheckedTextView) dref.findViewById(R.id.on_scene);
                 final CheckedTextView mClearScene = (CheckedTextView) dref.findViewById(R.id.clear_scene);
                 final CheckedTextView mInQuarters = (CheckedTextView) dref.findViewById(R.id.in_quarters);
 
+                Boolean found=false;
+                if (model.getResponding_personnel() != null) {
+                    for (RespondingPersonnel p : model.getResponding_personnel().values()) {
+                        String pshit = p.getPerson();
+                        if (p.getPerson().equals(DBB.getUser())) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                mRespondingToStation.setChecked(found);
                 mEnroute.setChecked(model.getEn_route());
                 mOnScene.setChecked(model.getOn_scene());
                 mClearScene.setChecked(model.getClear_scene());
                 mInQuarters.setChecked(model.getIn_quarters());
+
+
             } else {
 //                Log.i("uDFM(m)", "keys don't match d: " + dispatchKey.getText());
 //                Log.i("uDFM(m)", "keys don't match m: " + model.getKey());

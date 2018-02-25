@@ -1,5 +1,7 @@
 package org.fireground.dispatchbuddy;
 
+import android.util.Log;
+
 import com.google.firebase.database.IgnoreExtraProperties;
 
 import java.util.HashMap;
@@ -17,8 +19,7 @@ public class DispatchStatusModel {
     private Boolean clear_scene = false;
     private Boolean in_quarters = false;
 
-    public static Map<String, RespondingPersonnel> responding_personnel;
-
+    Map<String, RespondingPersonnel> responding_personnel;
     Map<String, RespondingUnits> responding_units;
 
     /* this isn't used by the adapter, it's here for pretty printing */
@@ -80,7 +81,8 @@ public class DispatchStatusModel {
     public void setIn_quarters(Boolean in_quarters) {
         this.in_quarters = in_quarters;
     }
-    public static Map<String, RespondingPersonnel> getResponding_personnel() {
+
+    public Map<String, RespondingPersonnel> getResponding_personnel() {
         return responding_personnel;
     }
     public Map<String, RespondingUnits> getResponding_units() {
@@ -89,40 +91,24 @@ public class DispatchStatusModel {
 
     public void setResponding_personnel(Map<String, RespondingPersonnel> responding_personnel) {
         this.responding_personnel = responding_personnel;
-//        Log.i("DSM()", "set model responding_personnel:"+responding_personnel);
     }
-//    public void setResponding_personnel(String person, Boolean state) {
-//        Log.i("DSM()", "set model responding_personnel with:"+person);
-//        Boolean z = responding_personnel.containsValue(person);
-//        Log.i("DSM()", "has person:"+z);
-//        Log.i("DSM()", "values:"+ responding_personnel.values());
-//        Log.i("DSM()", "keySet:"+ responding_personnel.keySet());
-//
-//        Map<String, RespondingPersonnel> rp = responding_personnel;
-//        if (!state) {
-//        } else {
-//            rp.put("pucky", new RespondingPersonnel(person));
-//        }
-//        Log.i("DSM(fn)", "remaining eS: "+responding_personnel.entrySet());
-//    }
 
     public void setResponding_units(Map<String, RespondingUnits> responding_units) {
         this.responding_units = responding_units;
-//        Log.i("DSM()", "set model responding_units:"+responding_units);
     }
 
-    public Map<String, Object> toMap() {
-//        Log.w("dsm", "DSM toMap");
-        HashMap<String, Object> result = new HashMap<String, Object>();
-
-        result.put("key", key);
-        result.put("en_route", en_route);
-        result.put("on_scene", on_scene);
-        result.put("clear_scene", clear_scene);
-        result.put("in_quarters", in_quarters);
-        result.put("responding_personnel", responding_personnel);
-        result.put("responding_units", responding_units);
-
-        return result;
-    }
+//    public Map<String, Object> toMap() {
+//        Log.e("dsm", "DSM toMap");
+//        HashMap<String, Object> result = new HashMap<String, Object>();
+//
+//        result.put("key", key);
+//        result.put("en_route", en_route);
+//        result.put("on_scene", on_scene);
+//        result.put("clear_scene", clear_scene);
+//        result.put("in_quarters", in_quarters);
+//        result.put("responding_personnel", responding_personnel);
+//        result.put("responding_units", responding_units);
+//
+//        return result;
+//    }
 }

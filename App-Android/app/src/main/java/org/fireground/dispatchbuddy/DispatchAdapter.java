@@ -8,6 +8,11 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.ValueEventListener;
+
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -23,6 +28,7 @@ import java.util.List;
 
 public class DispatchAdapter extends RecyclerView.Adapter<DispatchAdapter.DispatchViewHolder> {
     final private String TAG = "DA";
+    final private DispatchBuddyBase DBB = DispatchBuddyBase.getInstance();
 
     private List<DispatchModel> dispatchModelList;
     private String s;
@@ -47,6 +53,7 @@ public class DispatchAdapter extends RecyclerView.Adapter<DispatchAdapter.Dispat
         view.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                Log.e(TAG, "onClick fired for: "+v.getId());
                 listener.onItemClick(v, mViewHolder.getLayoutPosition());
             }
         });
@@ -62,8 +69,14 @@ public class DispatchAdapter extends RecyclerView.Adapter<DispatchAdapter.Dispat
 
     @Override
     public void onBindViewHolder(DispatchViewHolder holder, int position) {
-
         DispatchModel dispatch = dispatchModelList.get(position);
+
+        // use this to store the firebase key?
+        holder.item.setTag(dispatch.getKey());
+        dispatch.setAdapterPosition(holder.getAdapterPosition());
+
+        Log.e(TAG, "d:"+dispatch.getKey()+" itemID:"+holder.getItemId());
+        Log.e(TAG, "d:"+dispatch.getKey()+" adapterPos:"+holder.getAdapterPosition());
 
         // TODO: new items added AFTER initial load have the grayed out background
 
@@ -126,12 +139,16 @@ public class DispatchAdapter extends RecyclerView.Adapter<DispatchAdapter.Dispat
 
         short_datetime = sdfformatter.format(d);
 
+        String rpcount = String.valueOf(dispatch.getRespondingPersonnel().size());
+        Log.e(TAG, "rpcount: "+rpcount);
+
         holder.firebaseKey.setText(dispatch.getKey());
         holder.address.setText(dispatch.address);
         holder.timestamp.setText(short_datetime);
         holder.cross.setText(dispatch.cross);
         holder.nature.setText(dispatch.nature);
-        holder.responderCount.setText("");
+        holder.responderCount.setText(rpcount);
+
     }
 
     @Override

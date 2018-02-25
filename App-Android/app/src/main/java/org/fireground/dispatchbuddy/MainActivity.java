@@ -20,6 +20,7 @@ import android.widget.Button;
 import android.widget.Toast;
 import android.support.v7.widget.Toolbar;
 
+import com.android.volley.toolbox.Volley;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 
@@ -55,6 +56,7 @@ public class MainActivity extends AppCompatActivity {
     private static Boolean activityVisible = false;
 
     private DispatchBuddyBase DBB;
+    private DBVolley V;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -66,6 +68,8 @@ public class MainActivity extends AppCompatActivity {
         DBB = DispatchBuddyBase.getInstance();
         DBB.setAppContext(this.getApplicationContext());
         DBB.logjam();
+
+        V = DBVolley.getInstance(this.getApplicationContext());
 
         // see https://stackoverflow.com/questions/6762671/how-to-lock-the-screen-of-an-android-device
 //        powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
