@@ -30,6 +30,7 @@
     <string name="personnel_count">Personnel count</string>
 
     <string name="google_android_map_api_key">AIzaSyARTZLL2K00VxoH1XkBv4YjeqWkznXXZho</string>
+    <string name="google_ip_address_map_api_key">AIzaSyAXexsV69LPaoBxE5gMPpnHS_VY7Ydm7lA</string>
     <string name="service_not_available">Google Maps service is not available</string>
 
 
