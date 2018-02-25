@@ -54,17 +54,20 @@ class Firebase:
     def alreadyInFirebase(self, path, ev):
         nodes = self.firebase_db.child(path).get(token=self.firebase_user['idToken'])
         path = path.replace('dispatches', 'dispatchIDs')
-        pkey_val = {'pkey':'{}, {}, {}'.format(ev.isotimestamp, ev.nature, ev.address)}
-        self.logger.debug('checking if {} has {}'.format(path, pkey_val))
+        pkey_val = {'pkey':'{}, {}, {}'.format(ev['isotimestamp'], ev['nature'], ev['address'])}
+        self.logger.debug('checking for {}/{}'.format(path, pkey_val))
 
         try:
-            self.firebase_db.child(path).order_by_child('pkey').equal_to(pkey_val['pkey']).get(token=self.firebase_user['idToken'])
-            self.logger.info('{} already in Firebase'.format(pkey_val))
-            return True
+            x = self.firebase_db.child(path).order_by_child('pkey').equal_to(pkey_val['pkey']).get(token=self.firebase_user['idToken'])
+            if x:
+                self.logger.info('{} already in Firebase'.format(pkey_val))
+                return True
         except Exception as e:
             traceback.print_exc()
-            self.firebase_db.child(path).push(pkey_val, token=self.firebase_user['idToken'])
 
+        # store the pkey
+        self.logger.debug('storing {}/{}'.format(path, pkey_val))
+        self.firebase_db.child(path).push(pkey_val, token=self.firebase_user['idToken'])
         return False
 
 
@@ -102,9 +105,9 @@ class Firebase:
 
     def sendPushNotification(self, ev):
         data_message = {
-            "nature":       ev.nature,
-            "address":      ev.address,
-            "isotimestamp": ev.isotimestamp,
+            "nature":       ev['nature'],
+            "address":      ev['address'],
+            "isotimestamp": ev['isotimestamp'],
             "notification": {
                 "title": "DispatchBuddy",
                 "body" : "Dispatch received, open DispatchBuddy. This should've happened automatically",

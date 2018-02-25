@@ -102,6 +102,7 @@ def start_worker_init_db(**kwargs):
     # logging will show up in journalctl until MainProcess gets going
     logger.info('\x1b[1;35mworker_init({}) {!r}\x1b[0m'.format(os.getpid(), kwargs))
 
+FB=None
 firebase=None
 firebase_user=None
 firebase_db=None
