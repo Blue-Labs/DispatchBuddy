@@ -21,8 +21,12 @@
         android:checkMark="?android:attr/listChoiceIndicatorMultiple"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
         android:gravity="center_vertical"
+        android:paddingStart="6dp"
+        android:paddingEnd="0dp"
         android:text="@string/i_am_responding_to_station"
+        android:background="@drawable/dispatch_itemview_border"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -31,6 +35,7 @@
         android:id="@+id/mapView"
         android:layout_width="0dp"
         android:layout_height="260dp"
+        android:layout_marginTop="2dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/responding_to_station" />
