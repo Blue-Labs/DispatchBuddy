@@ -1,5 +1,7 @@
 package org.fireground.dispatchbuddy;
 
+import android.util.Log;
+
 import com.google.firebase.database.IgnoreExtraProperties;
 
 import java.util.HashMap;
@@ -34,12 +36,13 @@ public class DispatchModel {
     public String gmapurldir;
 
     /*
-     * private fields that won't go into Firebase
+     * private fields that won't go into Firebase, these need to be fetched and stored when
+     * a ValueChanged listener is fired or they'll be lost
      */
     private int icon_scenario_type; // the image used for the overall scenario for this incident
     private int icon_incident_state; // dispatched, en-route, on-scene, clear-of-scene, in-quarters
-    private String key; // Firebase created row key
-    private Integer adapterPosition; // position of this particular item in the RecyclerView
+    private String key; // Firebase created row key, set on POJO add/change in listener
+    private Integer adapterPosition; // position of this particular item in the RecyclerView, set in RecylerView.ViewHolder setup, must be obtained before an update wipes this out
     Map<String, RespondingPersonnel> respondingPersonnel = new HashMap<String, RespondingPersonnel>();
 
     public DispatchModel() {}
@@ -185,12 +188,11 @@ public class DispatchModel {
     public void setAdapterPosition(Integer adapterPosition) { this.adapterPosition = adapterPosition; }
     public void setRespondingPersonnel(Map<String, RespondingPersonnel> respondingPersonnel) { this.respondingPersonnel = respondingPersonnel; }
 
-//    public Map<String, Object> toMap() {
-////        Log.i("DispatchModel", "Map called");
-//        HashMap<String, Object> result = new HashMap<>();
-////        result.put("isotimestamp", isotimestamp);
-//
-//        return result;
-//    }
+    public Map<String, Object> toMap() {
+        Log.i("DispatchModel", "Map called");
+        HashMap<String, Object> result = new HashMap<>();
+//        result.put("isotimestamp", isotimestamp);
+        return result;
+    }
 }
 
