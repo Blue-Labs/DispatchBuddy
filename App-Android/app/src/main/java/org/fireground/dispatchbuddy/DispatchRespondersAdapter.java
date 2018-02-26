@@ -36,14 +36,9 @@ public class DispatchRespondersAdapter extends RecyclerView.Adapter<DispatchResp
     }
 
     @Override
-    public void onBindViewHolder(DispatchRespondersViewHolder holder, int position) {
-        String person = list.get(position);
-    }
-
-    @Override
     public DispatchRespondersViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.dispatch_item, parent, false);
+                .inflate(R.layout.dispatch_responders_item, parent, false);
 
         final DispatchRespondersViewHolder mViewHolder = new DispatchRespondersViewHolder(view);
 
@@ -79,5 +74,14 @@ public class DispatchRespondersAdapter extends RecyclerView.Adapter<DispatchResp
             locateButton = (ImageButton) itemView.findViewById(R.id.locatePerson);
         }
     }
+
+    @Override
+    public void onBindViewHolder(DispatchRespondersViewHolder holder, int position) {
+        String person = list.get(position);
+        Log.i(TAG, "DRV person is: "+person);
+        DBB.getProfileIcon(DBB.getAppContext(), holder.profileIcon, person);
+        holder.responderName.setText(person);
+    }
+
 
 }

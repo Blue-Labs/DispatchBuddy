@@ -74,10 +74,12 @@ public class DispatchesActivity extends AppCompatActivity implements
     public static List<DispatchStatusModel> dispatch_statuses;
     private DispatchAdapter adapter;
     private DispatchStatusAdapter statusAdapter;
+    private DispatchRespondersAdapter respondersAdapter;
 
     private TextView emptyText;
     private NotificationUtils mNotificationUtils;
     public static Dialog dispatchLongpressDialog;
+    public static Dialog dispatchOnClickDialog;
 
     private int eventCount = 0;
     private int startupCount = 10;
@@ -107,13 +109,13 @@ public class DispatchesActivity extends AppCompatActivity implements
         dispatches = new ArrayList<>();
         dispatch_statuses = new ArrayList<>();
 
-        recyclerView = (RecyclerView) findViewById(R.id.dispatch_list);
-        recyclerView.setHasFixedSize(true);
         LinearLayoutManager llm = new LinearLayoutManager(this);
         llm.setOrientation(LinearLayoutManager.VERTICAL);
         llm.setReverseLayout(true);
         llm.setStackFromEnd(true);
 
+        recyclerView = (RecyclerView) findViewById(R.id.dispatch_list);
+        recyclerView.setHasFixedSize(true);
         recyclerView.setLayoutManager(llm);
 
         adapter = new DispatchAdapter(dispatches, new CustomItemClickListener() {
@@ -129,9 +131,9 @@ public class DispatchesActivity extends AppCompatActivity implements
             }
         });
 
-        statusAdapter = new DispatchStatusAdapter(this);
-
         recyclerView.setAdapter(adapter);
+
+        statusAdapter = new DispatchStatusAdapter(this);
 
         setListeners();
         checkIfEmpty();
@@ -201,7 +203,6 @@ public class DispatchesActivity extends AppCompatActivity implements
             public void onChildChanged(DataSnapshot dataSnapshot, String s) {
                 DispatchModel model = dataSnapshot.getValue(DispatchModel.class);
 
-                Log.w(TAG, "model is: "+dataSnapshot.getKey()+" at position");
                 model.setKey(dataSnapshot.getKey());
 
                 // replace the existing POJO with a new instance. Note, this new POJO doesn't
@@ -687,21 +688,27 @@ public class DispatchesActivity extends AppCompatActivity implements
      * todo: learn this Map.Entry.. entrySet, see https://stackoverflow.com/questions/5826384/java-iteration-through-a-hashmap-which-is-more-efficient
      */
     public void dispatchesItemOnClick(final DispatchModel dispatch) {
-        Dialog dialog = new Dialog(this);
-        dialog.setContentView(R.layout.dispatch_responders_dialog);
-        dialog.setTitle("Responders");
-        dialog.show();
+        dispatchOnClickDialog = new Dialog(this);
+        dispatchOnClickDialog.setContentView(R.layout.dispatch_responders_dialog);
+        dispatchOnClickDialog.setTitle("Responders");
+        dispatchOnClickDialog.show();
 
-        recyclerView = (RecyclerView) dialog.findViewById(R.id.respondingPersonnelListView);
-        recyclerView.setHasFixedSize(true);
         LinearLayoutManager llm = new LinearLayoutManager(this);
         llm.setOrientation(LinearLayoutManager.VERTICAL);
         llm.setReverseLayout(true);
         llm.setStackFromEnd(true);
 
-        recyclerView.setLayoutManager(llm);
+        // private view, only valid for life of this dialog
+        RecyclerView rv = (RecyclerView) dispatchOnClickDialog.findViewById(R.id.respondingPersonnelListView);
+        rv.setHasFixedSize(true);
+        rv.setLayoutManager(llm);
 
-        adapter = new DispatchAdapter(dispatches, new CustomItemClickListener() {
+        final ArrayList<String> list = new ArrayList<>();
+        for(Map.Entry<String, RespondingPersonnel> entry: dispatch.getRespondingPersonnel().entrySet()) {
+            Log.e(TAG, dispatch.getAddress()+" responder: "+String.valueOf(entry.getValue()));
+            list.add(String.valueOf(entry.getValue()));
+        }
+        respondersAdapter = new DispatchRespondersAdapter(list, new CustomItemClickListener() {
             @Override
             public void onItemClick(View v, int position) {
                 dispatchesItemOnClick(dispatches.get(position));
@@ -714,16 +721,10 @@ public class DispatchesActivity extends AppCompatActivity implements
             }
         });
 
-        final ArrayList<String> list = new ArrayList<>();
-        for(Map.Entry<String, RespondingPersonnel> entry: dispatch.getRespondingPersonnel().entrySet()) {
-            Log.e(TAG, dispatch.getAddress()+" responder: "+String.valueOf(entry.getValue()));
-            list.add(String.valueOf(entry.getValue()));
-        }
+        rv.setAdapter(respondersAdapter);
 
         // can this be done before the dialog shows?
-//        final ArrayAdapter adapter = new RecyclerView.Adapter<>(this, R.layout.dispatch_responders_item, list);
-//        listView.setAdapter(adapter);
-
+        // tf is this.. final ArrayAdapter adapter = new RecyclerView.Adapter<>(this, R.layout.dispatch_responders_item, list);
     }
 
     public void dispatchesLongpressDialog(final DispatchModel dispatch) {
@@ -745,9 +746,6 @@ public class DispatchesActivity extends AppCompatActivity implements
         if (city == null) { city = "Meriden CT 06451"; }
 
         addGmapMarker(dispatch.getAddress()+" "+city, extra);
-
-
-        // Log.i(TAG, "build dialog for key:"+dispatch.getKey());
 
         // do onClick events
         final TextView dispatchKey = (TextView) dispatchLongpressDialog.findViewById(R.id.dispatchKey);
