@@ -7,7 +7,7 @@
     android:layout_height="match_parent"
     android:padding="3dp"
     android:layout_margin="0dp"
-    android:id="@+id/relativeLayout">
+    >
 
     <android.support.constraint.Guideline
         android:id="@+id/guideline"
