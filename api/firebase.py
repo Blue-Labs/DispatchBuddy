@@ -58,8 +58,12 @@ class Firebase:
         self.logger.debug('checking for {}/{}'.format(path, pkey_val))
 
         try:
-            x = self.firebase_db.child(path).order_by_child('pkey').equal_to(pkey_val['pkey']).get(token=self.firebase_user['idToken'])
-            if x:
+            if [e.item[1] for e in self.firebase_db         \
+                .child(path)\
+                .order_by_child('pkey')                     \
+                .equal_to(pkey_val['pkey'])                 \
+                .get(token=self.firebase_user['idToken'])   \
+                .each()]
                 self.logger.info('{} already in Firebase'.format(pkey_val))
                 return True
         except Exception as e:
