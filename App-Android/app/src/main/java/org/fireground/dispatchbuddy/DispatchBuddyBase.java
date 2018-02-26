@@ -156,10 +156,6 @@ class DispatchBuddyBase {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         androidID = Secure.getString(context.getContentResolver(), Secure.ANDROID_ID);
 
-        Log.d(TAG, "user is: "+user);
-        Log.d(TAG, "aid: "+androidID);
-        Log.d(TAG, "reg token: "+FirebaseMessagingRegToken);
-
         String domain = user.getEmail().split("@")[1].replaceAll("\\.", "_");
         DatabaseReference ref = getTopPathRef("/deviceRegistrations");
 
@@ -249,7 +245,6 @@ class DispatchBuddyBase {
                             Log.e(TAG, "no personnel records in firebase for: "+email);
                         } else {
                             Log.i(TAG, "getting profileIcon for: "+email);
-                            Log.i(TAG, "snap: is "+dataSnapshot.toString());
                             if (dataSnapshot.getValue() == null) {
                                 Log.w(TAG, "no personnel records found for: "+email);
                             } else {
@@ -313,7 +308,9 @@ class DispatchBuddyBase {
                           final JsonObjectCallbackInterface callback) {
 
         String url = "https://maps.googleapis.com/maps/api/geocode/json?address="
-                + address;
+                + address
+                +"&key="
+                + this.context.getResources().getString(R.string.google_ip_address_map_api_key);
 
         Log.d(TAG, "geocoding url: "+url);
 
@@ -324,6 +321,12 @@ class DispatchBuddyBase {
                     public void onResponse(JSONObject response) {
 //                        Log.e(TAG,"Response: " + response.toString());
                         // store address in firebase as our API is request limited
+
+                        // todo: handle error responses!
+                        /*
+                         * "{\"error_message\":\"You have exceeded your daily request quota for this API. We recommend registering for a key at the Google Developers Console: https:\\/\\/console.developers.google.com\\/apis\\/credentials?project=_\",\"results\":[],\"status\":\"OVER_QUERY_LIMIT\"}"
+                         */
+
                         DatabaseReference ref = getTopPathRef("/geocodedAddresses").push();
 
                         Map<String, Object> u = new HashMap<>();
