@@ -54,6 +54,7 @@ class Firebase:
     def alreadyInFirebase(self, path, ev):
         nodes = self.firebase_db.child(path).get(token=self.firebase_user['idToken'])
         path = path.replace('dispatches', 'dispatchIDs')
+
         pkey_val = {'pkey':'{}, {}, {}'.format(ev['isotimestamp'], ev['nature'], ev['address'])}
         self.logger.debug('checking for {}/{}'.format(path, pkey_val))
 
@@ -63,7 +64,7 @@ class Firebase:
                 .order_by_child('pkey')                     \
                 .equal_to(pkey_val['pkey'])                 \
                 .get(token=self.firebase_user['idToken'])   \
-                .each()]
+                .each()]:
                 self.logger.info('{} already in Firebase'.format(pkey_val))
                 return True
         except Exception as e:
@@ -96,7 +97,8 @@ class Firebase:
             if not self.alreadyInFirebase(path, ev):
                 self.logger.debug('push path is: {}'.format(path))
                 try:
-                    self.firebase_db.child(path).push(dict(ev._asdict()), token=self.firebase_user['idToken'])
+                    # this will become ev._asdict() when we can use the original namedtuple
+                    self.firebase_db.child(path).push(ev, token=self.firebase_user['idToken'])
                 except Exception as e:
                     self.logger.warning('Failed to store event in Firebase:{}: {}'.format(path,e))
 
@@ -183,4 +185,5 @@ if __name__ == '__main__':
 
     logger.debug('Firebase startup')
     FB=Firebase(config, logger)
-    FB.pushEvent(ev)
+    # can't pass the named tuple through celery yet
+    FB.pushEvent(ev._asdict())

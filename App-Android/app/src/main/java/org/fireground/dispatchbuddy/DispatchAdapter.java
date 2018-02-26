@@ -166,7 +166,13 @@ public class DispatchAdapter extends RecyclerView.Adapter<DispatchAdapter.Dispat
 
         short_datetime = sdfformatter.format(d);
 
-        String rpcount = String.valueOf(dispatch.getRespondingPersonnel().size());
+        String rpcount;
+        if (dispatch.getRespondingPersonnel() != null) {
+            rpcount = String.valueOf(dispatch.getRespondingPersonnel().size());
+        } else {
+            rpcount = "";
+        }
+
 //        Log.e(TAG, "rpcount: "+rpcount);
 
         holder.firebaseKey.setText(dispatch.getKey());

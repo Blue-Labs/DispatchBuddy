@@ -62,7 +62,7 @@ public class DispatchRespondersAdapter extends RecyclerView.Adapter<DispatchResp
     public static class DispatchRespondersViewHolder extends RecyclerView.ViewHolder {
         ImageView profileIcon;
         TextView responderName;
-        ImageButton locateButton;
+        ImageView locator;
 
         View item;
 
@@ -71,7 +71,7 @@ public class DispatchRespondersAdapter extends RecyclerView.Adapter<DispatchResp
             item = itemView;
             profileIcon = (ImageView) itemView.findViewById(R.id.profileIcon);
             responderName = (TextView) itemView.findViewById(R.id.responderName);
-            locateButton = (ImageButton) itemView.findViewById(R.id.locatePerson);
+            locator = (ImageView) itemView.findViewById(R.id.locatePerson);
         }
     }
 

@@ -203,6 +203,12 @@ def dispatch_job(self, id, payload):
     for k,v in sorted(ev._asdict().items()):
         logger.debug('  {:<12} {}'.format(k,v))
 
+
+    try:
+        store_event_firebase(ev)
+    except Exception as e:
+        logger.warning('failed to to call store_event_firebase: {}'.format(e))
+
     store_event(id, payload, ev._asdict())
 
     if unique_message(ev) is False:
@@ -213,6 +219,14 @@ def dispatch_job(self, id, payload):
     logger.info('res: {}'.format(res))
 
     #self.db_print_remote(id)
+
+
+def store_event_firebase(ev):
+    # store the event data and generate a data-notification
+    try:
+        FB.pushEvent(ev)
+    except Exception as e:
+        logger.warning('failed to post Firebase events: {}'.format(e))
 
 
 def store_event(id, payload, ev):
@@ -253,7 +267,10 @@ def store_event(id, payload, ev):
         logger.warning('failed to store event in BlueLabs DB: {}'.format(e))
 
     # store the event data and generate a data-notification
-    FB.pushEvent(ev)
+    try:
+        FB.pushEvent(ev)
+    except Exception as e:
+        logger.warning('failed to post Firebase events: {}'.format(e))
 
 
 def unique_message(ev):
