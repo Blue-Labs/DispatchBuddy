@@ -57,7 +57,7 @@ public class NotificationUtils extends ContextWrapper {
             NotificationChannel myChannel =
                     new NotificationChannel(
                             ANDROID_CHANNEL_ID,
-                            getResources().getString(R.string.app_name),
+                            getResources().getString(R.string.appName),
                             NotificationManager.IMPORTANCE_HIGH); // maybe IMPORTANCE_MAX isn't allowed here?
 
             // Configure the channel's initial settings
@@ -66,8 +66,8 @@ public class NotificationUtils extends ContextWrapper {
             myChannel.setLightColor(0xffff0000);
             myChannel.setBypassDnd(true);
             myChannel.setShowBadge(true);
-            myChannel.setDescription("@string/app_name");
-            myChannel.setName("@string/app_name");
+            myChannel.setDescription("@string/appName");
+            myChannel.setName("@string/appName");
             myChannel.setVibrationPattern(vibrationScheme);
             myChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             myChannel.setSound(alarmSound, att);

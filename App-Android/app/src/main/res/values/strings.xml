@@ -1,6 +1,5 @@
 <resources>
-    <string name="app_name">DispatchBuddy</string>
-    <string name="app_version">v1.0.0-alpha2</string>
+    <string name="appName">DispatchBuddy</string>
     <string name="fireground.org_login_title">Fireground.org</string>
     <string name="fireground.org_station_name">station name</string>
     <string name="fireground.org_username">email address</string>
