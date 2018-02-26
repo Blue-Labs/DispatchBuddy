@@ -12,15 +12,16 @@ def format_to_SMS(mdict):
 
 
 # Download the Python helper library from twilio.com/docs/python/install
-from twilio.rest import TwilioRestClient
+from twilio.rest import Client
 
 # Your Account Sid and Auth Token from twilio.com/user/account
 account_sid = "xxx"
 auth_token  = "xxx"
-client = TwilioRestClient(account_sid, auth_token)
+client = Client(account_sid, auth_token)
 
-message = client.messages.create(body="testing my foo",
+message = client.messages.create(
   to="nnn",
+  body="testing my foo",
   from_="nnn",
   media_url=["https://southmeriden-vfd.org/images/dispatchbuddy/AUTO_ACCID.png",
   "https://southmeriden-vfd.org/images/dispatchbuddy/ROAD_HAZARD.png"])
