@@ -68,15 +68,42 @@ public class DispatchAdapter extends RecyclerView.Adapter<DispatchAdapter.Dispat
     }
 
     @Override
+    public int getItemCount() {
+        return dispatchModelList.size();
+    }
+
+    public static class DispatchViewHolder extends RecyclerView.ViewHolder {
+        ImageView scenario_type;
+        TextView firebaseKey, address, timestamp, cross, nature, responderCount;
+        View item;
+
+        public DispatchViewHolder(View itemView) {
+            super(itemView);
+
+            item = itemView;
+            firebaseKey = (TextView) itemView.findViewById(R.id.firebaseKey);
+            scenario_type = (ImageView) itemView.findViewById(R.id.scenario_type);
+            address = (TextView) itemView.findViewById(R.id.address);
+            timestamp = (TextView) itemView.findViewById(R.id.timestamp);
+            cross = (TextView) itemView.findViewById(R.id.cross);
+            nature = (TextView) itemView.findViewById(R.id.nature);
+            responderCount = (TextView) itemView.findViewById(R.id.respondingPersonnelCount);
+        }
+    }
+
+    @Override
     public void onBindViewHolder(DispatchViewHolder holder, int position) {
         DispatchModel dispatch = dispatchModelList.get(position);
 
         // use this to store the firebase key?
         holder.item.setTag(dispatch.getKey());
-        dispatch.setAdapterPosition(holder.getAdapterPosition());
 
-        Log.e(TAG, "d:"+dispatch.getKey()+" itemID:"+holder.getItemId());
-        Log.e(TAG, "d:"+dispatch.getKey()+" adapterPos:"+holder.getAdapterPosition());
+        int apos = holder.getAdapterPosition();
+//        Log.i(TAG, "adapter position is set to "+apos+" for "+dispatch.getKey()+"/"+dispatch.getAddress());
+        dispatch.setAdapterPosition(holder.getAdapterPosition());
+//        Log.i(TAG, "confirming adapter position: "+dispatch.getAdapterPosition());
+//        Log.e(TAG, "d:"+dispatch.getKey()+" itemID:"+holder.getItemId());
+//        Log.e(TAG, "d:"+dispatch.getKey()+" adapterPos:"+holder.getAdapterPosition());
 
         // TODO: new items added AFTER initial load have the grayed out background
 
@@ -140,7 +167,7 @@ public class DispatchAdapter extends RecyclerView.Adapter<DispatchAdapter.Dispat
         short_datetime = sdfformatter.format(d);
 
         String rpcount = String.valueOf(dispatch.getRespondingPersonnel().size());
-        Log.e(TAG, "rpcount: "+rpcount);
+//        Log.e(TAG, "rpcount: "+rpcount);
 
         holder.firebaseKey.setText(dispatch.getKey());
         holder.address.setText(dispatch.address);
@@ -149,29 +176,6 @@ public class DispatchAdapter extends RecyclerView.Adapter<DispatchAdapter.Dispat
         holder.nature.setText(dispatch.nature);
         holder.responderCount.setText(rpcount);
 
-    }
-
-    @Override
-    public int getItemCount() {
-        return dispatchModelList.size();
-    }
-
-    public static class DispatchViewHolder extends RecyclerView.ViewHolder {
-        ImageView scenario_type;
-        TextView firebaseKey, address, timestamp, cross, nature, responderCount;
-        View item;
-
-        public DispatchViewHolder(View itemView) {
-            super(itemView);
-            item = itemView;
-            firebaseKey = (TextView) itemView.findViewById(R.id.firebaseKey);
-            scenario_type = (ImageView) itemView.findViewById(R.id.scenario_type);
-            address = (TextView) itemView.findViewById(R.id.address);
-            timestamp = (TextView) itemView.findViewById(R.id.timestamp);
-            cross = (TextView) itemView.findViewById(R.id.cross);
-            nature = (TextView) itemView.findViewById(R.id.nature);
-            responderCount = (TextView) itemView.findViewById(R.id.respondingPersonnelCount);
-        }
     }
 }
 
