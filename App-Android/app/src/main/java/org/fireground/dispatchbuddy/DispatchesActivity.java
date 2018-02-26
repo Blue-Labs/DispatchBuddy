@@ -201,7 +201,19 @@ public class DispatchesActivity extends AppCompatActivity implements
             public void onChildChanged(DataSnapshot dataSnapshot, String s) {
                 DispatchModel model = dataSnapshot.getValue(DispatchModel.class);
 
+                Log.w(TAG, "model is: "+dataSnapshot.getKey()+" at position");
                 model.setKey(dataSnapshot.getKey());
+
+                // replace the existing POJO with a new instance. Note, this new POJO doesn't
+                // have any local fields :}
+                Integer index = getDispatchItemIndex(model);
+                DispatchModel old = dispatches.get(index);
+
+                model.setIcon_scenario_type(old.getIcon_scenario_type());
+                model.setIcon_incident_state(old.getIcon_incident_state());
+                model.setAdapterPosition(old.getAdapterPosition());
+                model.setRespondingPersonnel(old.getRespondingPersonnel());
+
                 dispatches.set(getDispatchItemIndex(model), model);
                 adapter.notifyItemChanged(model.getAdapterPosition());
 
@@ -271,18 +283,18 @@ public class DispatchesActivity extends AppCompatActivity implements
                             model.setKey(key);
                             dispatch_statuses.add(model);
 
-                            Log.e(TAG, "responding personnel for "+key+", "+String.valueOf(model.getResponding_personnel()));
+//                            Log.e(TAG, "responding personnel for "+key+", "+String.valueOf(model.getResponding_personnel()));
                             if (model.getResponding_personnel() != null) {
-                                Log.e(TAG, "rp size: "+model.getResponding_personnel().size());
+//                                Log.e(TAG, "rp size: "+model.getResponding_personnel().size());
 
                                 Boolean found = false;
-                                Log.e(TAG, "dispatches size: "+dispatches.size());
+//                                Log.e(TAG, "dispatches size: "+dispatches.size());
                                 for(DispatchModel d: dispatches) {
-                                    Log.e(TAG, "dm:> "+d.getKey()+", mk:> "+model.getKey());
+//                                    Log.e(TAG, "dm:> "+d.getKey()+", mk:> "+model.getKey());
                                     if (d.getKey().equals(model.getKey())) {
                                         found=true;
                                         // update the responding personnel
-                                        Log.e(TAG, "setting RSPC of "+model.getResponding_personnel().size()+" to "+model.getResponding_personnel() + " for "+model.getKey());
+//                                        Log.e(TAG, "setting RSPC of "+model.getResponding_personnel().size()+" to "+model.getResponding_personnel() + " for "+model.getKey());
                                         d.setRespondingPersonnel(model.getResponding_personnel());
                                         int index = getDispatchItemIndex(d);
                                         adapter.notifyItemChanged(index);
@@ -320,19 +332,19 @@ public class DispatchesActivity extends AppCompatActivity implements
                             }
 
                             for(DispatchModel d: dispatches) {
-                                Log.e(TAG, "dmZ:> "+d.getKey()+" ["+d.getAddress()+"] mk:> "+model.getKey());
+//                                Log.e(TAG, "dmZ:> "+d.getKey()+" ["+d.getAddress()+"] mk:> "+model.getKey());
                                 if (d.getKey().equals(model.getKey())) {
                                     // update the responding personnel
                                     Integer di = d.getAdapterPosition();
-                                    Log.e(TAG, "setting index ["+di+"] RSP count("+msize+") to "+rp + " for "+mkey);
+//                                    Log.e(TAG, "setting index ["+di+"] RSP count("+msize+") to "+rp + " for "+mkey);
                                     d.setRespondingPersonnel(model.getResponding_personnel());
                                     adapter.notifyItemChanged(di);
                                 }
                             }
 
-                            Log.e(TAG, "(chgZ)responding personnel: "+String.valueOf(model.getResponding_personnel()));
+//                            Log.e(TAG, "(chgZ)responding personnel: "+String.valueOf(model.getResponding_personnel()));
                             if (model.getResponding_personnel() != null) {
-                                Log.e(TAG, "(chgZ)rp size: "+model.getResponding_personnel().size());
+//                                Log.e(TAG, "(chgZ)rp size: "+model.getResponding_personnel().size());
 
                             }
 
