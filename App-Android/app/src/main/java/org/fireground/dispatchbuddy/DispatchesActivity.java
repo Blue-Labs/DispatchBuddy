@@ -449,7 +449,7 @@ public class DispatchesActivity extends AppCompatActivity implements
 
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-//                Log.d(TAG, address+" stored: "+dataSnapshot.exists());
+                Log.d(TAG, address+" stored: "+dataSnapshot.exists());
                 if (!dataSnapshot.exists()) {
                     DBB.getLatLng(
                            address,
@@ -457,6 +457,7 @@ public class DispatchesActivity extends AppCompatActivity implements
 
                                 @Override
                                 public void onSuccess(JSONObject response) {
+                                    Log.d(TAG, "JSON addr data: "+response);
                                     addGmapMarker(response, extra);
                                 }
                             });
@@ -561,7 +562,7 @@ public class DispatchesActivity extends AppCompatActivity implements
 
                     @Override
                     public void onSuccess(JSONObject response) {
-                        //Log.d(TAG, "gmap driving directions: "+response);
+//                        Log.d(TAG, "gmap driving directions: "+response);
                         extractGmapAPIDriveRoutes zpop = new extractGmapAPIDriveRoutes();
                         routes = zpop.parse(response);
                         //Log.d(TAG, "routes: "+routes);
@@ -596,7 +597,12 @@ public class DispatchesActivity extends AppCompatActivity implements
                         }
 
                         // Drawing polyline in the Google Map for the i-th route
-                        gmap.addPolyline(lineOptions);
+                        if (lineOptions != null) {
+                            gmap.addPolyline(lineOptions);
+                        } else {
+                            Log.e(TAG, "failed to extract polyline directions");
+                        }
+
                     }
                 });
     }
@@ -732,6 +738,7 @@ public class DispatchesActivity extends AppCompatActivity implements
         dispatchLongpressDialog.setContentView(R.layout.dispatch_longpress_dialog);
         dispatchLongpressDialog.setTitle("Event activity");
         dispatchLongpressDialog.show();
+
 
         createGmap(dispatchLongpressDialog);
 
