@@ -122,10 +122,36 @@ public class DispatchStatusAdapter {
             });
         }
 
-        model.setEn_route(mEnroute.isChecked());
-        model.setOn_scene(mOnScene.isChecked());
-        model.setClear_scene(mClearScene.isChecked());
-        model.setIn_quarters(mInQuarters.isChecked());
+        if (model == null) {
+            // no status exists yet, make it so
+            Map<String, Object> newStatus = new HashMap<>();
+            newStatus.put("en_route", mEnroute.isChecked());
+            newStatus.put("on_scene", mOnScene.isChecked());
+            newStatus.put("clear_scene", mClearScene.isChecked());
+            newStatus.put("in_quarters", mInQuarters.isChecked());
+            DBB.getTopPathRef("/dispatch-status").child((String) dispatchKey.getText()).updateChildren(newStatus, new DatabaseReference.CompletionListener() {
+                @Override
+                public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
+                    if (databaseError != null) {
+                        Log.e(TAG,"new model could not be saved " + databaseError.getMessage());
+                    }
+                }
+            });
+        } else {
+            model.setEn_route(mEnroute.isChecked());
+            model.setOn_scene(mOnScene.isChecked());
+            model.setClear_scene(mClearScene.isChecked());
+            model.setIn_quarters(mInQuarters.isChecked());
+            DBB.getTopPathRef("/dispatch-status").child(key).setValue(model);
+//            DBB.getTopPathRef("/dispatch-status").child(key).updateChildren(model, new DatabaseReference.CompletionListener() {
+//                @Override
+//                public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
+//                    if (databaseError != null) {
+//                        Log.e(TAG,"updated model could not be saved " + databaseError.getMessage());
+//                    }
+//                }
+//            });
+        }
 
         // update our dispatches view
         // TODO: put this string builder in the Model
@@ -140,9 +166,6 @@ public class DispatchStatusAdapter {
             status = "en-route";
         }
 
-        // now that all our buttons are updated, update FB
-        DBB.getTopPathRef("/dispatch-status").child(key).setValue(model);
-        Log.d(TAG, "updating dispatch model's status for "+key);
         DBB.getTopPathRef("/dispatches").child(key).child("event_status").setValue(status);
     }
 
@@ -171,6 +194,7 @@ public class DispatchStatusAdapter {
         final Dialog dref = DispatchesActivity.dispatchLongpressDialog;
         if (dref.isShowing()) {
             final TextView dispatchKey = (TextView) dref.findViewById(R.id.dispatchKey);
+
             if (model.getKey().equals(dispatchKey.getText())) {
                 // TODO: set checkbox for responding
                 // TODO: clicking on alternate device with unmatched state, will react opposite as intended
