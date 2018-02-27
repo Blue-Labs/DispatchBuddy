@@ -14,6 +14,7 @@ import android.view.WindowManager;
  */
 
 public class windowAndPower {
+    public static String TAG = "wAP";
 
     public static void setWindowParameters(Activity a) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -52,15 +53,22 @@ public class windowAndPower {
     // todo: https://stackoverflow.com/questions/19074466/android-how-to-show-dialog-or-activity-over-lock-screen-not-unlock-the-screen/25707716
     public static void unlockAndShowScreen(Context ctx) {
         PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
-        boolean isInteractive = pm.isInteractive();
-        boolean isDeviceIdle =  pm.isDeviceIdleMode();
+        boolean isInteractive=false;
+        boolean isDeviceIdle=false;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+            isInteractive = pm.isInteractive();
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            isDeviceIdle = pm.isDeviceIdleMode();
+        }
 
         // this is deprecated -- not that it doesn't lie to us anyway, it reports my physical S8+ screen is on even when black
         boolean isScreenOn =    pm.isScreenOn();
 
-        Log.e("screen interactive........................", ""+isInteractive);
-        Log.e("screen idle...............................", ""+isDeviceIdle);
-        Log.e("screen on.................................", ""+isScreenOn);
+        Log.d("screen interactive........................", ""+isInteractive);
+        Log.d("screen idle...............................", ""+isDeviceIdle);
+        Log.d("screen on.................................", ""+isScreenOn);
 
         // is pm.* lying to us
         if(true || isInteractive==false)

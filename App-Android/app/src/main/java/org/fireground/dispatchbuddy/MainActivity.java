@@ -10,6 +10,7 @@ import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.os.PowerManager;
+import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -23,6 +24,7 @@ import android.support.v7.widget.Toolbar;
 import com.android.volley.toolbox.Volley;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.common.api.GoogleApiClient;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -131,14 +133,16 @@ public class MainActivity extends AppCompatActivity {
         Boolean otherPerms=false;
 
         int available = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(MainActivity.this);
+        Log.d(TAG, "Google play services version: "+GoogleApiAvailability.GOOGLE_PLAY_SERVICES_VERSION_CODE);
         if (available == ConnectionResult.SUCCESS) {
-//            Log.w(TAG, "Google Play Services is ok");
+            Log.i(TAG, "Google Play Services is ok");
         } else if (GoogleApiAvailability.getInstance().isUserResolvableError(available)) {
-//            Log.w(TAG, "GPS, error occurred but we can fix it");
+            Log.w(TAG, "Google Play Services error occurred but we can fix it");
             Dialog dialog = GoogleApiAvailability.getInstance().getErrorDialog(MainActivity.this, available, ERROR_DIALOG_REQUEST);
             dialog.show();
             GoogleApiAvailability.getInstance().makeGooglePlayServicesAvailable(this);
         } else {
+            Log.w(TAG, "Google Play Services is unfixable, cannot make it go!");
             Toast.makeText(this, "Google API services not available, parts of DispatchBuddy won't work for you", Toast.LENGTH_SHORT).show();
         }
 
@@ -157,23 +161,25 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // special permission case
-        try {
-            NotificationManager n = (NotificationManager) getApplicationContext().getSystemService(Context.NOTIFICATION_SERVICE);
-            if (n.isNotificationPolicyAccessGranted()) {
-                notificationPermission = true;
-                AudioManager audioManager = (AudioManager) getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
-                audioManager.setRingerMode(AudioManager.RINGER_MODE_SILENT);
-            } else {
-                // Ask the user to grant access
-                Intent intent = new Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
-                startActivityForResult(intent, 99);
-            }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            try {
+                NotificationManager n = (NotificationManager) getApplicationContext().getSystemService(Context.NOTIFICATION_SERVICE);
+                if (n.isNotificationPolicyAccessGranted()) {
+                    notificationPermission = true;
+                    AudioManager audioManager = (AudioManager) getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
+                    audioManager.setRingerMode(AudioManager.RINGER_MODE_SILENT);
+                } else {
+                    // Ask the user to grant access
+                    Intent intent = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
+                    startActivityForResult(intent, 99);
+                }
 
-            if (!notificationPermission || !otherPerms) {
-                return false;
+                if (!notificationPermission || !otherPerms) {
+                    return false;
+                }
+            } catch (NoSuchMethodError e) {
+                Log.w(TAG, "can't use isNotificationPolicyAccessGranted on this platform");
             }
-        } catch (NoSuchMethodError e) {
-            Log.w(TAG, "can't use isNotificationPolicyAccessGranted on this platform");
         }
 
         return true;
