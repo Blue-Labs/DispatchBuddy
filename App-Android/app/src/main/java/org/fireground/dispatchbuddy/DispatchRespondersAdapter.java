@@ -1,6 +1,9 @@
 package org.fireground.dispatchbuddy;
 
+import android.content.ClipData;
+import android.support.v7.util.SortedList;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.util.SortedListAdapterCallback;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -17,23 +20,65 @@ import java.util.List;
  */
 
 public class DispatchRespondersAdapter extends RecyclerView.Adapter<DispatchRespondersAdapter.DispatchRespondersViewHolder> {
-
     final private String TAG = "DA";
     final private DispatchBuddyBase DBB = DispatchBuddyBase.getInstance();
 
-    // todo: make a POJO dispatchRespondersModel;
-    private List<String> list;
     CustomItemClickListener listener;
 
-    public DispatchRespondersAdapter(List<String> list, CustomItemClickListener listener) {
-        this.list = list;
-        this.listener = listener;
+    SortedList<DispatchResponderModel> mData;
+    final LayoutInflater mLayoutInflater;
+    public DispatchRespondersAdapter(LayoutInflater layoutInflater, DispatchResponderModel... items) {
+        mLayoutInflater = layoutInflater;
+        mData = new SortedList<DispatchResponderModel>(DispatchResponderModel.class, new SortedListAdapterCallback<DispatchResponderModel>(this) {
+            @Override
+            public int compare(DispatchResponderModel t0, DispatchResponderModel t1) {
+                if (!t0.getEmail().equals(t1.getEmail())) {
+                    return t0.getEmail().compareToIgnoreCase(t1.getEmail());
+                }
+
+                if (!t0.getFullName().equals(t1.getFullName())) {
+                    return t0.getFullName().compareToIgnoreCase(t1.getFullName());
+                }
+
+                return 0;
+            }
+
+            @Override
+            public boolean areContentsTheSame(DispatchResponderModel oldItem,
+                                              DispatchResponderModel newItem) {
+                return oldItem.getEmail().equals(newItem.getEmail()) &&
+                        oldItem.getFullName().equals(newItem.getFullName());
+            }
+
+            @Override
+            public boolean areItemsTheSame(DispatchResponderModel item1, DispatchResponderModel item2) {
+                return item1.getEmail().equals(item2.getEmail());
+            }
+        });
+        for (DispatchResponderModel item : items) {
+            mData.add(item);
+        }
     }
 
-    @Override
-    public int getItemCount() {
-        return list.size();
+    public void addItem(DispatchResponderModel item) {
+        mData.add(item);
     }
+
+
+
+
+    // todo: make a POJO dispatchRespondersModel;
+//    private List<String> list;
+//
+//    public DispatchRespondersAdapter(List<String> list, CustomItemClickListener listener) {
+//        this.list = list;
+//        this.listener = listener;
+//    }
+//
+//    @Override
+//    public int getItemCount() {
+//        return list.size();
+//    }
 
     @Override
     public DispatchRespondersViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
@@ -56,6 +101,7 @@ public class DispatchRespondersAdapter extends RecyclerView.Adapter<DispatchResp
                 return listener.onItemLongClick(v, mViewHolder.getLayoutPosition());
             }
         });
+
         return mViewHolder;
     }
 
@@ -73,6 +119,7 @@ public class DispatchRespondersAdapter extends RecyclerView.Adapter<DispatchResp
             responderName = (TextView) itemView.findViewById(R.id.responderName);
             locator = (ImageView) itemView.findViewById(R.id.locatePerson);
         }
+
     }
 
     @Override
