@@ -317,8 +317,16 @@ public class DispatchesActivity extends AppCompatActivity implements
                     public void onChildChanged(DataSnapshot dataSnapshot, String s) {
                         DispatchStatusModel model = dataSnapshot.getValue(DispatchStatusModel.class);
                         if (model != null) {
+                            final String key = dataSnapshot.getKey();
+                            model.setKey(key);
+
                             int index = getStatusItemIndex(model);
-                            dispatch_statuses.set(index, model);
+                            if (index < 0) { // our parent node changed, but this child is new
+                                dispatch_statuses.add(model);
+                                // todo: we shouldn't be doing this, use a better way of tracking the key..duh
+                            } else {
+                                dispatch_statuses.set(index, model);
+                            }
 
                             // todo: onremoved for when it goes to zero responders...
                             Integer msize;
@@ -485,8 +493,23 @@ public class DispatchesActivity extends AppCompatActivity implements
 
     public void addGmapMarker(JSONObject object, @Nullable Map<String, Object> extra) {
         JSONObject loc = null;
+        String status = null;
         double lat=0L;
         double lng=0L;
+
+        Log.d(TAG, "responses: "+object.toString());
+
+        try {
+            status = object.getString("status");
+            if (!status.equals("OK")) {
+                Log.e(TAG, "JSON object has undesired results, status is: "+status);
+                Toast.makeText(this, "Failed to fetch Marker LatLng",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
 
         try {
             loc = object.getJSONArray("results")
@@ -554,6 +577,7 @@ public class DispatchesActivity extends AppCompatActivity implements
     }
 
     public void getGmapDirections(LatLng origin, LatLng destination) {
+        Log.d(TAG, "fetching Gmap drive directions");
         DBB.getGmapDirectionsJson(
                 origin,
                 destination,
@@ -563,9 +587,10 @@ public class DispatchesActivity extends AppCompatActivity implements
                     @Override
                     public void onSuccess(JSONObject response) {
 //                        Log.d(TAG, "gmap driving directions: "+response);
+                        Log.d(TAG, "gmap driving directions obtained");
                         extractGmapAPIDriveRoutes zpop = new extractGmapAPIDriveRoutes();
                         routes = zpop.parse(response);
-                        //Log.d(TAG, "routes: "+routes);
+//                        Log.d(TAG, "drive routes: "+routes);
 
                         ArrayList<LatLng> points = null;
                         PolylineOptions lineOptions = null;
@@ -599,6 +624,7 @@ public class DispatchesActivity extends AppCompatActivity implements
                         // Drawing polyline in the Google Map for the i-th route
                         if (lineOptions != null) {
                             gmap.addPolyline(lineOptions);
+                            Log.d(TAG, "polylines added to map");
                         } else {
                             Log.e(TAG, "failed to extract polyline directions");
                         }
@@ -617,7 +643,7 @@ public class DispatchesActivity extends AppCompatActivity implements
         Map<String, Object> extra = new HashMap<>();
         extra.put("type", "primary station");
         extra.put("title", "SMVFD");
-        addGmapMarker("31 Camp St South Meriden CT 06451", extra);
+        addGmapMarker("31 Camp St Meriden CT 06451", extra);
 
 //        LatLng smvfd_station = new LatLng(41.5173067,-72.8293687);
 //
@@ -739,7 +765,7 @@ public class DispatchesActivity extends AppCompatActivity implements
         dispatchLongpressDialog.setTitle("Event activity");
         dispatchLongpressDialog.show();
 
-
+        markerList.clear();
         createGmap(dispatchLongpressDialog);
 
         // hardwire for testing
@@ -747,12 +773,16 @@ public class DispatchesActivity extends AppCompatActivity implements
         Map<String, Object> extra = new HashMap<>();
         extra.put("type", "incident location");
 
-        // todo: we need the zip code
+        // todo: we need the zip code, this can probably go in a Firebase Config object
         String city = dispatch.getOwning_city();
+
         if (city == null) { city = dispatch.getCity(); }
         if (city == null) { city = "Meriden CT 06451"; }
+        if (!city.endsWith(" [\\d-]{5,10}")) {
+            city += " 06451";
+        }
 
-        addGmapMarker(dispatch.getAddress()+" "+city, extra);
+        addGmapMarker(dispatch.getAddress()+", "+city, extra);
 
         // do onClick events
         final TextView dispatchKey = (TextView) dispatchLongpressDialog.findViewById(R.id.dispatchKey);

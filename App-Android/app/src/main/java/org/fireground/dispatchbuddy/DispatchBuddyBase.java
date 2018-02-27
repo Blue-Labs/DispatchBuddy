@@ -24,6 +24,7 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Logger;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.firebase.messaging.FirebaseMessaging;
@@ -82,6 +83,8 @@ class DispatchBuddyBase {
             // how many instances are created
             fbDatabase = FirebaseDatabase.getInstance();
             fbDatabase.setPersistenceEnabled(false);
+
+//            FirebaseDatabase.getInstance().setLogLevel(Logger.Level.DEBUG);
         }
 
         // currently for profile icons, probably will use to hold fireground image data
@@ -126,11 +129,12 @@ class DispatchBuddyBase {
         try {
             user = FirebaseAuth.getInstance().getCurrentUser();
             // todo: some form of race codition existed prior to making this singleton, user!=null, but fields were
-//            Log.e(TAG, "user.DisplayName: "+user.getDisplayName());
-//            Log.e(TAG, "user.email: "+user.getEmail());
-//            Log.e(TAG, "user.Uid: "+user.getUid());
             if (user == null) {
-                Log.e(TAG, "user shouldn't be null!");
+                Log.d(TAG, "user is null");
+            } else {
+                Log.e(TAG, "user.DisplayName: "+user.getDisplayName());
+                Log.e(TAG, "user.email: "+user.getEmail());
+                Log.e(TAG, "user.Uid: "+user.getUid());
             }
         } catch (NullPointerException e) {
             Log.w(TAG, e.getLocalizedMessage());
@@ -145,7 +149,7 @@ class DispatchBuddyBase {
             this.user = null;
             this.domain = null;
         }
-        Log.i(TAG, "getUser returning: "+this.user);
+        Log.d(TAG, "getUser returning: "+this.user);
         return this.user;
     }
 
@@ -296,10 +300,11 @@ class DispatchBuddyBase {
      */
 
     public String prepareAddress(String address) {
-        address = address.replaceAll(" ", "+")
-                .replaceAll(",", "")
+        address = address
                 .replaceAll("\\.", " ")
-                .replaceAll("  ", " ")
+                .replaceAll(",", " ")
+                .replaceAll("  +", " ")
+                .replaceAll(" ", "+")
                 .toUpperCase();
         return address;
     }
@@ -307,9 +312,14 @@ class DispatchBuddyBase {
     public void getLatLng(final String address,
                           final JsonObjectCallbackInterface callback) {
 
+        // the bounds key will bias (prefer) addresses in South Meriden district
+        // http://www.automatingosint.com/blog/geographic-bounding-box-drawing-tool/
+        // sw 41.507946089754675,-72.86632062769684
+        // ne 41.54187465697938,-72.80623914576324
         String url = "https://maps.googleapis.com/maps/api/geocode/json?address="
                 + address
-                +"&key="
+                + "&bounds=41.507946089754675,-72.86632062769684|41.54187465697938,-72.80623914576324"
+                + "&key="
                 + this.context.getResources().getString(R.string.google_ip_address_map_api_key);
 
         Log.d(TAG, "geocoding url: "+url);
@@ -326,26 +336,34 @@ class DispatchBuddyBase {
                         /*
                          * "{\"error_message\":\"You have exceeded your daily request quota for this API. We recommend registering for a key at the Google Developers Console: https:\\/\\/console.developers.google.com\\/apis\\/credentials?project=_\",\"results\":[],\"status\":\"OVER_QUERY_LIMIT\"}"
                          */
+                        if (response.toString().contains("status\":\"OK")) {
+                            DatabaseReference ref = getTopPathRef("/geocodedAddresses").push();
 
-                        DatabaseReference ref = getTopPathRef("/geocodedAddresses").push();
+                            Map<String, Object> u = new HashMap<>();
+                            u.put("address", address);
+                            u.put("geocoded", response.toString());
 
-                        Map<String, Object> u = new HashMap<>();
-                        u.put("address", address);
-                        u.put("geocoded", response.toString());
-
-                        ref.updateChildren(u, new DatabaseReference.CompletionListener() {
-                            @Override
-                            public void onComplete(DatabaseError databaseError,
-                                                   DatabaseReference databaseReference) {
-                                if (databaseError != null) {
-                                    Log.e(TAG,"Geocoded address could not be saved "
-                                            + databaseError.getMessage());
-                                } else {
-                                    Log.e(TAG,"Geocoded address saved successfully.");
+                            ref.updateChildren(u, new DatabaseReference.CompletionListener() {
+                                @Override
+                                public void onComplete(DatabaseError databaseError,
+                                                       DatabaseReference databaseReference) {
+                                    if (databaseError != null) {
+                                        Log.e(TAG,"Geocoded address could not be saved "
+                                                + databaseError.getMessage());
+                                    } else {
+                                        Log.e(TAG,"Geocoded address saved successfully.");
+                                    }
                                 }
-                            }
-                        });
-                        callback.onSuccess(response);
+                            });
+                            callback.onSuccess(response);
+                        } else {
+                            Integer index1 = response.toString().indexOf("status")+3;
+                            Integer index2 = response.toString().indexOf('"', index1);
+                            String status = response.toString().substring(index1, index2);
+                            Log.e(TAG, "JSON Response not acceptable: "+status);
+                            // todo: notify david of failed parsing
+                        }
+
                     }
                 }, new Response.ErrorListener() {
 
@@ -384,6 +402,7 @@ class DispatchBuddyBase {
                     public void onResponse(JSONObject response) {
 //                        Log.e(TAG,"Response: " + response.toString());
                         // don't store these, the time and warnings change constantly
+                        Log.d(TAG, "JSON drive directions content fetched");
                         callback.onSuccess(response);
                     }
                 }, new Response.ErrorListener() {
@@ -391,6 +410,7 @@ class DispatchBuddyBase {
                     @Override
                     public void onErrorResponse(VolleyError error) {
                         // TODO Auto-generated method stub
+                        Log.e(TAG, "failed to fetch JSON:"+error.getLocalizedMessage());
                     }
                 });
 
