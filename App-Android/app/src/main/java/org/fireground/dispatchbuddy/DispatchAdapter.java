@@ -173,8 +173,6 @@ public class DispatchAdapter extends RecyclerView.Adapter<DispatchAdapter.Dispat
             rpcount = "";
         }
 
-//        Log.e(TAG, "rpcount: "+rpcount);
-
         holder.firebaseKey.setText(dispatch.getKey());
         holder.address.setText(dispatch.address);
         holder.timestamp.setText(short_datetime);

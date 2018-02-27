@@ -85,7 +85,7 @@ public class LoginActivity extends Activity {
                             user = null;
                             Log.e(TAG, "auth failed");
                             Toast.makeText(LoginActivity.this, "Authentication failed.",
-                                    Toast.LENGTH_SHORT).show();
+                                    Toast.LENGTH_LONG).show();
                         }
                         updateUI(user);
                     }
@@ -95,6 +95,9 @@ public class LoginActivity extends Activity {
                     public void onFailure(@NonNull Exception e) {
                         if (e instanceof FirebaseAuthException) {
                             //((FirebaseAuthException) e).getErrorCode());
+                            Toast.makeText(LoginActivity.this, e.getLocalizedMessage(),
+                                    Toast.LENGTH_LONG).show();
+                        } else {
                             Toast.makeText(LoginActivity.this, e.getLocalizedMessage(),
                                     Toast.LENGTH_LONG).show();
                         }
