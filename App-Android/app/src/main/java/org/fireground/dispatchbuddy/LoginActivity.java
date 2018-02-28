@@ -19,8 +19,6 @@ import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 
-import java.lang.reflect.Method;
-
 /*
  * Created by david on 2/9/18.
  */
@@ -98,7 +96,7 @@ public class LoginActivity extends Activity {
                                     }
                                 }
                             });
-                            finishLogin.start();
+                            finishLogin.run();
 
                         } else {
                             user = null;
@@ -131,7 +129,7 @@ public class LoginActivity extends Activity {
             mEmailField.setText(null);
             mPasswordField.setText(null);
             finish();
-            startActivity(new Intent(LoginActivity.this, DispatchesActivity.class));
+            startActivity(new Intent(LoginActivity.this, ActivityDispatches.class));
         }
     }
 

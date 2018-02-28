@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.os.PowerManager;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
-import android.support.v7.app.AppCompatActivity;
 
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -70,8 +69,8 @@ public class DispatchBuddyFirebaseMessagingService extends FirebaseMessagingServ
 
         n.sendNotification(nature, address, NotificationCompat.PRIORITY_MAX, isotimestamp, false);
 
-        if (!MainActivity.isActivityVisible()) {
-            Intent i = new Intent(DispatchBuddyFirebaseMessagingService.this, MainActivity.class);
+        if (!ActivityMain.isActivityVisible()) {
+            Intent i = new Intent(DispatchBuddyFirebaseMessagingService.this, ActivityMain.class);
             startActivity(i);
         }
     }

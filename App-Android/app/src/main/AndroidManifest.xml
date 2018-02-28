@@ -32,7 +32,7 @@
         <uses-library android:name="com.google.android.maps" />
 
         <activity
-            android:name=".MainActivity"
+            android:name=".ActivityMain"
             android:label=""
             android:theme="@style/CustomToolbarStyle">
             <intent-filter>
@@ -48,7 +48,7 @@
         </activity>
         <activity android:name=".LoginActivity" />
         <activity
-            android:name=".DispatchesActivity"
+            android:name=".ActivityDispatches"
             android:label=""></activity>
 
         <receiver
