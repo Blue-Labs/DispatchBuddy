@@ -78,16 +78,35 @@ public class LoginActivity extends Activity {
                     @Override
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         if (task.isSuccessful()) {
-                            user = DBB.getUser();
-                            Log.e(TAG, "auth success");
-                            DBB.pushFirebaseClientRegistrationData(DBB.getRegToken());
+                            // horrible bad hack.
+                            // sleep for a bit, race condition in Firebase, our object from
+                            // getCurrentUser() may not be fully created yet.
+                            // todo: take this out when Firebase responds to the support question
+                            Thread finishLogin = new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        Log.e(TAG, "auth success delay starting");
+                                        Thread.sleep(500);
+                                        // Do some stuff
+                                        user = DBB.getUser();
+                                        Log.e(TAG, "auth success");
+                                        DBB.pushFirebaseClientRegistrationData(DBB.getRegToken());
+                                        updateUI(user);
+                                    } catch (Exception e) {
+                                        e.getLocalizedMessage();
+                                    }
+                                }
+                            });
+                            finishLogin.start();
+
                         } else {
                             user = null;
                             Log.e(TAG, "auth failed");
                             Toast.makeText(LoginActivity.this, "Authentication failed.",
                                     Toast.LENGTH_LONG).show();
+                            updateUI(user);
                         }
-                        updateUI(user);
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {

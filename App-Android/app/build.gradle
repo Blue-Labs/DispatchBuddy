@@ -10,8 +10,8 @@ android {
         applicationId "org.fireground.dispatchbuddy"
         minSdkVersion 19
         targetSdkVersion 27
-        versionCode 180227002
-        versionName "1.0.1-alpha1"
+        versionCode 180227003
+        versionName "1.0.1-alpha2"
         resValue "string", "appVersion", "${defaultConfig.versionName}"
         multiDexEnabled true
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"

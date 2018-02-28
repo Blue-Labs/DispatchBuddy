@@ -79,12 +79,12 @@ class DispatchBuddyBase {
     private DispatchBuddyBase() {
         // wtf Firebase, local cache is readable even without authentication, ugg!??
         if (fbDatabase == null) {
-            // this is locked inside here because it can only happen once regardless of
+            // this is set at the first DBB instancing because it can only happen once regardless of
             // how many instances are created
             fbDatabase = FirebaseDatabase.getInstance();
             fbDatabase.setPersistenceEnabled(false);
 
-//            FirebaseDatabase.getInstance().setLogLevel(Logger.Level.DEBUG);
+            FirebaseDatabase.getInstance().setLogLevel(Logger.Level.DEBUG);
         }
 
         // currently for profile icons, probably will use to hold fireground image data
@@ -94,28 +94,25 @@ class DispatchBuddyBase {
         }
 
         // fbDatabase.getReference("dispatches").keepSynced(false); // todo: HIPAA and general privacy concerns
+
+        // it'd be nice to know _what_ happened for this to fire
         authListener = new FirebaseAuth.AuthStateListener() {
             @Override
             public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
                 FirebaseUser _user = firebaseAuth.getCurrentUser();
                 if (_user != null) {
                     user = _user.getEmail();
-                    Log.i(TAG, "detected user authentication: "+user);
+                    Log.i(TAG, "detected authenticated user: "+user);
 
                 } else {
-                    Log.i(TAG, "detected user signout");
+                    Log.i(TAG, "no user is logged in");
                 }
-                // ...
             }
         };
         FirebaseAuth.getInstance().addAuthStateListener(authListener);
 
         FirebaseMessagingRegToken = FirebaseInstanceId.getInstance().getToken();
         Log.d(TAG, "FBmsging token for this device is: " + FirebaseMessagingRegToken);
-    }
-
-    public void logjam() {
-        Log.e("BRO!", "***************************** singleton test");
     }
 
     public void logOut() {
@@ -128,7 +125,7 @@ class DispatchBuddyBase {
         FirebaseUser user;
         try {
             user = FirebaseAuth.getInstance().getCurrentUser();
-            // todo: some form of race codition existed prior to making this singleton, user!=null, but fields were
+            // todo: some form of race codition exists, sometimes user is null, sometimes user!=null, but fields are
             if (user == null) {
                 Log.d(TAG, "user is null");
             } else {
