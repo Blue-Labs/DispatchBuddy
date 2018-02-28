@@ -34,7 +34,7 @@ public class windowAndPower {
     @SuppressWarnings("deprecation")
     private static void setScreenAPIunder27(Activity a) {
         Window window = a.getWindow();
-        Log.e("wAP", "trying to set window params: "+window);
+//        Log.e("wAP", "trying to set window params: "+window);
 
         // temporarily dismiss secure keyguard (deprecated in API 27)
         window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
@@ -67,9 +67,9 @@ public class windowAndPower {
         // this is deprecated -- not that it doesn't lie to us anyway, it reports my physical S8+ screen is on even when black
         boolean isScreenOn =    pm.isScreenOn();
 
-        Log.d(TAG,"screen interactive........................"+isInteractive);
-        Log.d(TAG,"screen idle..............................."+isDeviceIdle);
-        Log.d(TAG,"screen on................................."+isScreenOn);
+//        Log.d(TAG,"screen interactive........................"+isInteractive);
+//        Log.d(TAG,"screen idle..............................."+isDeviceIdle);
+//        Log.d(TAG,"screen on................................."+isScreenOn);
 
         // is pm.* lying to us
         if(true || isInteractive==false)

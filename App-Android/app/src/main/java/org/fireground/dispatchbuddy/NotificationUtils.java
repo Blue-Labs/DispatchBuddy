@@ -10,7 +10,6 @@ import android.content.ContextWrapper;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.net.Uri;
@@ -18,8 +17,6 @@ import android.os.Build;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
-
-import org.fireground.dispatchbuddy.R;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -84,7 +81,7 @@ public class NotificationUtils extends ContextWrapper {
                 getApplicationContext().getResources(),
                 R.mipmap.ic_launcher);
 
-        Intent resultIntent = new Intent(this, DispatchesActivity.class);
+        Intent resultIntent = new Intent(this, ActivityDispatches.class);
 
         // Because clicking the notification opens a new ("special") activity, there's
         // no need to create an artificial back stack.
