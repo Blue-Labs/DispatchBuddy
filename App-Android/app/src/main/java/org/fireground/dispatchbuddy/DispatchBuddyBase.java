@@ -2,7 +2,6 @@ package org.fireground.dispatchbuddy;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
-import android.media.Image;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import android.provider.Settings.Secure;
@@ -16,28 +15,23 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.firebase.ui.storage.images.FirebaseImageLoader;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.Logger;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.storage.FileDownloadTask;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
 import org.json.JSONObject;
 
-import java.io.File;
-import java.io.IOException;
-import java.lang.ref.Reference;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -84,7 +78,7 @@ class DispatchBuddyBase {
             fbDatabase = FirebaseDatabase.getInstance();
             fbDatabase.setPersistenceEnabled(false);
 
-            FirebaseDatabase.getInstance().setLogLevel(Logger.Level.DEBUG);
+//            FirebaseDatabase.getInstance().setLogLevel(Logger.Level.DEBUG);
         }
 
         // currently for profile icons, probably will use to hold fireground image data
@@ -129,9 +123,9 @@ class DispatchBuddyBase {
             if (user == null) {
                 Log.d(TAG, "user is null");
             } else {
-                Log.e(TAG, "user.DisplayName: "+user.getDisplayName());
-                Log.e(TAG, "user.email: "+user.getEmail());
-                Log.e(TAG, "user.Uid: "+user.getUid());
+//                Log.e(TAG, "user.DisplayName: "+user.getDisplayName());
+//                Log.e(TAG, "user.email: "+user.getEmail());
+//                Log.e(TAG, "user.Uid: "+user.getUid());
             }
         } catch (NullPointerException e) {
             Log.w(TAG, e.getLocalizedMessage());
@@ -146,7 +140,7 @@ class DispatchBuddyBase {
             this.user = null;
             this.domain = null;
         }
-        Log.d(TAG, "getUser returning: "+this.user);
+//        Log.d(TAG, "getUser returning: "+this.user);
         return this.user;
     }
 
@@ -180,6 +174,80 @@ class DispatchBuddyBase {
             }
         });
     }
+
+    public static ArrayList<ModelPersonnel> personnel = new ArrayList<>();
+    public void getAllPersonnel() {
+        DatabaseReference ref = getTopPathRef("/personnel");
+        ref.addChildEventListener(new ChildEventListener() {
+            @Override
+            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+                ModelPersonnel model = dataSnapshot.getValue(ModelPersonnel.class);
+                Log.d(TAG, "personnel: "+dataSnapshot.toString());
+                model.setKey(dataSnapshot.getKey());
+                personnel.add(model);
+            }
+
+            @Override
+            public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+                ModelPersonnel model = dataSnapshot.getValue(ModelPersonnel.class);
+                String key = dataSnapshot.getKey();
+                model.setKey(key);
+                Integer index = getPersonnelIndex(key);
+                if (index < 0) { // our parent node changed, but this child is new
+                    personnel.add(model);
+                } else {
+                    personnel.set(index, model);
+                }
+            }
+
+            @Override
+            public void onChildRemoved(DataSnapshot dataSnapshot) {
+
+            }
+
+            @Override
+            public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+    }
+
+    private int getPersonnelIndex(String key) {
+        int index = -1;
+
+        for (int i = 0; i < personnel.size(); i++) {
+            if (personnel.get(i).getKey().equals(key)) {
+                index = i;
+                break;
+            }
+        }
+
+        return index;
+    }
+    public static ModelPersonnel getPerson(String email) {
+        for (int i = 0; i < personnel.size(); i++) {
+            if (personnel.get(i).getEmail().equals(email)) {
+                return personnel.get(i);
+            }
+        }
+
+        return null;
+    }
+
+    public static ModelPersonnel addNullPerson(String email) {
+        // used to create a nearly blank object due to missing records in FB
+        ModelPersonnel person = new ModelPersonnel();
+        person.setEmail(email);
+        personnel.add(person);
+        Log.w("DBB", "personnel: "+personnel.toString());
+        return person;
+    }
+
 
     /*
      * The assumption is made that the caller knows if "/" is prefixed at root level tables
@@ -241,46 +309,49 @@ class DispatchBuddyBase {
                 .addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
                     public void onDataChange(DataSnapshot dataSnapshot) {
+                        String filename;
+
                         if (!dataSnapshot.exists()) {
                             // no such person exists?
-                            Log.e(TAG, "no personnel records in firebase for: "+email);
+                            Log.e(TAG, "cannot get profileIcon, no personnel records in firebase for: "+email);
+                            // apply a blank image
+                            filename = "fire_axes_and_shield_64x64.png";
+
                         } else {
                             Log.i(TAG, "getting profileIcon for: "+email);
                             if (dataSnapshot.getValue() == null) {
                                 Log.w(TAG, "no personnel records found for: "+email);
+                                filename = "fire_axes_and_shield_64x64.png";
+
                             } else {
                                 DataSnapshot ds1 = dataSnapshot.getChildren().iterator().next();
                                 String key = ds1.getKey();
 
                                 String imageUrl = (String) dataSnapshot.child(key).child("profileIcon").getValue();
-                                String filename = imageUrl.substring(imageUrl.lastIndexOf('/')+1);
-
-                                String path = buildPathPrefix("/personnel");
-                                Log.i(TAG, "building image path: "+path+"profileIcons/"+filename);
-                                // gs://dispatchbuddy-ca126.appspot.com/debug/personnel/smvfd_info
-
-                                StorageReference image = fbStorage
-                                        .getReference()
-                                        .child(path)
-                                        .child("/profileIcons")
-                                        .child(filename);
-
-                                try {
-                                    Glide.with(context)
-                                            .using(new FirebaseImageLoader())
-                                            .load(image)
-                                            .diskCacheStrategy(DiskCacheStrategy.NONE) // turn these off after testing=good
-                                            .skipMemoryCache(true)
-                                            .into(view);
-                                    // .error(R.drawable.defaultuserimage)
-                                    Glide.get(context).clearMemory();
-                                    Glide.get(context).clearDiskCache();
-                                } catch (Exception e) {
-                                    Log.e(TAG, e.getLocalizedMessage());
-                                }
-
+                                filename = imageUrl.substring(imageUrl.lastIndexOf('/')+1);
                             }
+                        }
 
+                        String path = buildPathPrefix("/personnel");
+                        Log.i(TAG, "building image path: "+path+"profileIcons/"+filename);
+
+                        StorageReference image = fbStorage
+                                .getReference()
+                                .child(path)
+                                .child("/profileIcons")
+                                .child(filename);
+                        try {
+                            Glide.with(context)
+                                    .using(new FirebaseImageLoader())
+                                    .load(image)
+                                    .diskCacheStrategy(DiskCacheStrategy.NONE) // turn these off after testing=good
+                                    .skipMemoryCache(true)
+                                    .into(view);
+                            // .error(R.drawable.defaultuserimage)
+                            Glide.get(context).clearMemory();
+                            Glide.get(context).clearDiskCache();
+                        } catch (Exception e) {
+                            Log.e(TAG, e.getLocalizedMessage());
                         }
                     }
 
