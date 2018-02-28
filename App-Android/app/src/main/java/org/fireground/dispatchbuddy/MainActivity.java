@@ -29,6 +29,10 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.IntStream;
+
 /**
  * Created by david on 2/9/18.
  *
@@ -60,6 +64,8 @@ public class MainActivity extends AppCompatActivity {
     private DispatchBuddyBase DBB;
     private DBVolley V;
 
+    private Map<String, Boolean> permissions = new HashMap<>();
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -69,7 +75,6 @@ public class MainActivity extends AppCompatActivity {
         context = getApplicationContext();
         DBB = DispatchBuddyBase.getInstance();
         DBB.setAppContext(this.getApplicationContext());
-        DBB.logjam();
 
         V = DBVolley.getInstance(this.getApplicationContext());
 
@@ -84,7 +89,9 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         Log.i(TAG, "checking needed permissions");
-        if (isServicesOK()) {
+        testServicesAndPermissions();
+
+        if (iHaveNeededPermissions()) {
             Button doLogin = (Button) findViewById(R.id.doLogin);
             doLogin.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -111,12 +118,31 @@ public class MainActivity extends AppCompatActivity {
                 Intent i = new Intent(this, LoginActivity.class);
                 startActivity(i);
             }
+        } else {
+            Toast.makeText(this, "Not all desired permissions were granted, some things won't work for you", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private boolean hasPermissions(Context context, String... permissions) {
-        if (context != null && permissions != null) {
-            for (String permission : permissions) {
+    private Boolean iHaveNeededPermissions() {
+        Boolean isGood = true;
+        Log.d(TAG, "permissions map: "+permissions.toString());
+        for (String key: permissions.keySet()) {
+            if (!permissions.get(key)) {
+                isGood=false;
+                Toast.makeText(this, key+" needed", Toast.LENGTH_SHORT).show();
+            }
+        }
+        return isGood;
+    }
+
+    private boolean hasPermissions(Context context, String... _permissions) {
+        if (context != null && _permissions != null) {
+            // mark all the perms first, then request
+            for (String permission: _permissions) {
+                permissions.put(permission, ActivityCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED);
+            }
+
+            for (String permission : _permissions) {
                 if (ActivityCompat.shouldShowRequestPermissionRationale(this, permission)) {
                     Toast.makeText(this, permission+" permission previously denied", Toast.LENGTH_SHORT).show();
                 }
@@ -128,36 +154,26 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    private Boolean isServicesOK(){
-        Boolean notificationPermission=false;
-        Boolean otherPerms=false;
+    private void testServicesAndPermissions(){
+        permissions.put("googleApi", false);
+        permissions.put("notificationPermissions", false);
 
         int available = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(MainActivity.this);
         Log.d(TAG, "Google play services version: "+GoogleApiAvailability.GOOGLE_PLAY_SERVICES_VERSION_CODE);
         if (available == ConnectionResult.SUCCESS) {
             Log.i(TAG, "Google Play Services is ok");
+            permissions.put("googleApi", true);
         } else if (GoogleApiAvailability.getInstance().isUserResolvableError(available)) {
             Log.w(TAG, "Google Play Services error occurred but we can fix it");
             Dialog dialog = GoogleApiAvailability.getInstance().getErrorDialog(MainActivity.this, available, ERROR_DIALOG_REQUEST);
             dialog.show();
             GoogleApiAvailability.getInstance().makeGooglePlayServicesAvailable(this);
+            // hope that fixed it buddy!
+            permissions.put("googleApi", true);
         } else {
             Log.w(TAG, "Google Play Services is unfixable, cannot make it go!");
             Toast.makeText(this, "Google API services not available, parts of DispatchBuddy won't work for you", Toast.LENGTH_SHORT).show();
-        }
-
-        int PERMISSION_REQUEST_ID = 10;
-        /*Manifest.permission.WRITE_EXTERNAL_STORAGE*/
-        String[] PERMISSIONS = {
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
-                , Manifest.permission.ACCESS_FINE_LOCATION
-                , Manifest.permission.ACCESS_COARSE_LOCATION
-        };
-
-        if(!hasPermissions(this, PERMISSIONS)){
-            ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_REQUEST_ID);
-        } else {
-            otherPerms=true;
+            permissions.put("googleApi", false);
         }
 
         // special permission case
@@ -165,24 +181,37 @@ public class MainActivity extends AppCompatActivity {
             try {
                 NotificationManager n = (NotificationManager) getApplicationContext().getSystemService(Context.NOTIFICATION_SERVICE);
                 if (n.isNotificationPolicyAccessGranted()) {
-                    notificationPermission = true;
+                    permissions.put("notificationPermissions", true);
                     AudioManager audioManager = (AudioManager) getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
-                    audioManager.setRingerMode(AudioManager.RINGER_MODE_SILENT);
+                    //audioManager.setRingerMode(AudioManager.RINGER_MODE_SILENT);
                 } else {
                     // Ask the user to grant access
+                    permissions.put("notificationPermissions", false);
+                    Toast.makeText(this, "DispatchBuddy needs Notification Policy Access", Toast.LENGTH_SHORT).show();
                     Intent intent = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
                     startActivityForResult(intent, 99);
                 }
-
-                if (!notificationPermission || !otherPerms) {
-                    return false;
-                }
             } catch (NoSuchMethodError e) {
                 Log.w(TAG, "can't use isNotificationPolicyAccessGranted on this platform");
+                // pretend it's ok
+                permissions.put("notificationPermissions", true);
             }
+        } else {
+            // pretend it's ok
+            permissions.put("notificationPermissions", true);
         }
 
-        return true;
+        int PERMISSION_REQUEST_ID = 98;
+        /*Manifest.permission.WRITE_EXTERNAL_STORAGE*/
+        String[] PERMISSIONS = {
+                Manifest.permission.ACCESS_FINE_LOCATION
+                , Manifest.permission.ACCESS_COARSE_LOCATION
+        };
+
+        if(!hasPermissions(this, PERMISSIONS)){
+            Toast.makeText(this, "Requesting for popup style permissions", Toast.LENGTH_SHORT).show();
+            ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_REQUEST_ID);
+        }
     }
 
     @Override
@@ -258,7 +287,13 @@ public class MainActivity extends AppCompatActivity {
                 Log.i(TAG,"oAR RESULT CANCELED");
 
             }
-        } else {
+        } else if (requestCode == 99) {
+            if (resultCode==1) {
+                permissions.put("notificationsPermission", true);
+            }
+        }
+
+        else {
             Log.i(TAG,"oAR other...");
         }
 
@@ -266,10 +301,19 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
+                                           String _permissions[], int[] grantResults) {
         Log.w(TAG, "request code:"+requestCode);
-        Log.w(TAG, "request perms:"+permissions[0].toString());
-        Log.w(TAG, "request granted:"+grantResults[0]);
+
+//        requires API 24+
+//        IntStream.range(0, permissions.length).forEach(
+//                n-> {
+//                    Log.w(TAG, "  request perm: "+permissions[n]+", grant result: "+grantResults[n]);
+//                }
+//        );
+
+        for(int n=0; n<_permissions.length; n++) {
+            Log.w(TAG, "  request perm: "+_permissions[n]+", grant result: "+grantResults[n]);
+        }
 
         switch (requestCode) {
 //            case MY_PERMISSIONS_REQUEST_READ_CONTACTS: {
@@ -287,6 +331,13 @@ public class MainActivity extends AppCompatActivity {
 //                }
 //                return;
 //            }
+
+            case 98: {
+                for(int n=0; n<_permissions.length; n++) {
+                    permissions.put(_permissions[n], grantResults[n]==PackageManager.PERMISSION_GRANTED);
+                    Log.w(TAG, "  request perm: "+_permissions[n]+", grant result: "+grantResults[n]);
+                }
+            }
 
             case 10: {
                 if (grantResults.length > 0
