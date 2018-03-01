@@ -3,6 +3,7 @@ package org.fireground.dispatchbuddy;
 import android.annotation.SuppressLint;
 import android.app.Dialog;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -738,6 +739,8 @@ public class ActivityDispatches extends AppCompatActivity implements
         dispatchOnClickDialog.setContentView(R.layout.dispatch_responders_dialog);
         dispatchOnClickDialog.setTitle("Responders");
         dispatchOnClickDialog.show();
+        dispatchOnClickDialog.setCanceledOnTouchOutside(true);
+        dispatchOnClickDialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
 
         LinearLayoutManager llm = new LinearLayoutManager(this);
         llm.setOrientation(LinearLayoutManager.VERTICAL);
