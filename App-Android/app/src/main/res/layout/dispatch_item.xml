@@ -31,7 +31,7 @@
 
     <TextView
         android:id="@+id/timestamp"
-        android:layout_width="64sp"
+        android:layout_width="60sp"
         android:layout_height="0dp"
         android:textSize="13sp"
         app:layout_constraintBottom_toTopOf="@id/nature"
@@ -45,11 +45,14 @@
         android:layout_height="wrap_content"
         android:maxHeight="26sp"
         android:minHeight="26sp"
-        android:textSize="20sp"
+        android:textSize="19sp"
         android:textStyle="bold"
-        app:layout_constraintEnd_toStartOf="@id/timestamp"
-
+        android:ellipsize="none"
+        android:singleLine="true"
+        android:requiresFadingEdge="horizontal"
+        android:fadingEdgeLength="30dp"
         app:layout_constraintHorizontal_bias="0"
+        app:layout_constraintEnd_toStartOf="@id/timestamp"
         app:layout_constraintStart_toEndOf="@id/scenario_type"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -61,7 +64,10 @@
         android:minHeight="14sp"
         android:textColor="@color/colorPrimaryDark"
         android:textSize="10sp"
-
+        android:ellipsize="none"
+        android:singleLine="true"
+        android:requiresFadingEdge="horizontal"
+        android:fadingEdgeLength="30dp"
         app:layout_constraintEnd_toStartOf="@id/timestamp"
         app:layout_constraintHeight_max="6sp"
         app:layout_constraintHorizontal_bias="0.0"
@@ -75,6 +81,10 @@
         android:layout_height="wrap_content"
         android:maxHeight="22sp"
         android:minHeight="22sp"
+        android:ellipsize="none"
+        android:singleLine="true"
+        android:requiresFadingEdge="horizontal"
+        android:fadingEdgeLength="30dp"
         app:layout_constraintEnd_toStartOf="@id/respondingPersonnelIcon"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toEndOf="@+id/scenario_type"
