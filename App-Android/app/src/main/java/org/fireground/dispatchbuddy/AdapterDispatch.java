@@ -30,7 +30,7 @@ public class AdapterDispatch extends RecyclerView.Adapter<AdapterDispatch.ViewHo
     private Date d;
     private String short_datetime;
     private SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    private SimpleDateFormat sdfformatter = new SimpleDateFormat("MMM d''yy\n h:ma");
+    private SimpleDateFormat sdfformatter = new SimpleDateFormat("MMM d''yy\n h:mma");
     CustomItemClickListener listener;
 
     public AdapterDispatch(List<ModelDispatch> modelDispatchList, CustomItemClickListener listener) {
