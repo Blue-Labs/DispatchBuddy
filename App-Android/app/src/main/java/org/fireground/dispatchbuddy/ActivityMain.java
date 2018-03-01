@@ -39,6 +39,13 @@ import java.util.Map;
  *       (still playing default sound, not mp3)
  * TODO: make icons for notifications
  * TODO: make a general DispatchBuddy icon
+ * TODO: refactor dispatches arraylist into sortedlist like personnel
+ * TODO: make toolbar menu active on every activity
+ * TODO: recolor "alarm fire sounding" icon for pale smoke
+ * TODO: scale toolbar icon down a pinch, it's a bit big
+ * TODO: toolbar version is cut off on thin phones
+ * TODO: cache drive route directions for ~10 minutes
+ *
  *
  * notes:
  *
