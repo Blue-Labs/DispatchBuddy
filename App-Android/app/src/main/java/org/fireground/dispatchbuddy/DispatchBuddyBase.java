@@ -335,6 +335,8 @@ class DispatchBuddyBase {
                         String path = buildPathPrefix("/personnel");
                         Log.i(TAG, "building image path: "+path+"profileIcons/"+filename);
 
+                        // future ref: https://www.journaldev.com/13759/android-picasso-tutorial
+
                         StorageReference image = fbStorage
                                 .getReference()
                                 .child(path)
@@ -344,12 +346,12 @@ class DispatchBuddyBase {
                             Glide.with(context)
                                     .using(new FirebaseImageLoader())
                                     .load(image)
-                                    .diskCacheStrategy(DiskCacheStrategy.NONE) // turn these off after testing=good
-                                    .skipMemoryCache(true)
+//                                    .diskCacheStrategy(DiskCacheStrategy.NONE) // turn these off after testing=good
+//                                    .skipMemoryCache(true)
                                     .into(view);
                             // .error(R.drawable.defaultuserimage)
-                            Glide.get(context).clearMemory();
-                            Glide.get(context).clearDiskCache();
+//                            Glide.get(context).clearMemory();
+//                            Glide.get(context).clearDiskCache();
                         } catch (Exception e) {
                             Log.e(TAG, e.getLocalizedMessage());
                         }
@@ -372,6 +374,7 @@ class DispatchBuddyBase {
                 .replaceAll("\\.", " ")
                 .replaceAll(",", " ")
                 .replaceAll("  +", " ")
+                .replaceAll("&", "and")
                 .replaceAll(" ", "+")
                 .toUpperCase();
         return address;
@@ -386,7 +389,7 @@ class DispatchBuddyBase {
         // ne 41.54187465697938,-72.80623914576324
         String url = "https://maps.googleapis.com/maps/api/geocode/json?address="
                 + address
-                + "&bounds=41.507946089754675,-72.86632062769684|41.54187465697938,-72.80623914576324"
+                + "&bounds=41.509927,-72.858410|41.53740,-72.807598"
                 + "&key="
                 + this.context.getResources().getString(R.string.google_ip_address_map_api_key);
 
