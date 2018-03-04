@@ -1,6 +1,5 @@
 package org.fireground.dispatchbuddy;
 
-import android.nfc.Tag;
 import android.support.v7.util.SortedList;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.util.SortedListAdapterCallback;
@@ -11,7 +10,12 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.google.firebase.crash.FirebaseCrash;
+
 import java.util.ArrayList;
+
+import static org.fireground.dispatchbuddy.DispatchBuddyBase.addNullPerson;
+import static org.fireground.dispatchbuddy.DispatchBuddyBase.getPerson;
 
 /**
  * Created by david on 2/24/18.
@@ -19,7 +23,6 @@ import java.util.ArrayList;
 
 public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispatchResponders.ViewHolderDispatchResponders> {
     final private String TAG = "DA";
-    final private DispatchBuddyBase DBB = DispatchBuddyBase.getInstance();
 
     CustomItemClickListener listener;
 
@@ -63,10 +66,10 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
 
         for (String e : emails) {
             Log.w(TAG, "email is:"+e);
-            ModelPersonnel person = DBB.getPerson(e);
+            ModelPersonnel person = getPerson(e);
             if (person == null) {
                 Log.e(TAG, "***** missing personnel file for "+e);
-                person = DBB.addNullPerson(e);
+                person = addNullPerson(e);
                 Log.e(TAG, "created local: "+person);
             }
             mData.add(person);
@@ -95,6 +98,9 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
 
         final ViewHolderDispatchResponders mViewHolder = new ViewHolderDispatchResponders(view);
 
+        FirebaseCrash.log("mViewHolder is: "+mViewHolder.toString());
+        FirebaseCrash.log("parent is: "+parent.toString());
+
         view.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -106,7 +112,8 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
         view.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View v) {
-                return listener.onItemLongClick(v, mViewHolder.getLayoutPosition());
+                Integer lp = mViewHolder.getLayoutPosition();
+                return listener.onItemLongClick(v, lp);
             }
         });
 
@@ -144,7 +151,7 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
         } else {
             String person = mData.get(position).getEmail();
             Log.i(TAG, "DRV person is: " + person.toString());
-            DBB.getProfileIcon(DBB.getAppContext(), holder.profileIcon, person);
+            DispatchBuddyBase.getProfileIcon(DispatchBuddyBase.context, holder.profileIcon, person);
             String fullName = mData.get(position).getFullName();
             if (fullName == null) {
                 String f = mData.get(position).getFirstName();
