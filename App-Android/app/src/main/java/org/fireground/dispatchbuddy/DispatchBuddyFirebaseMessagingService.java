@@ -16,7 +16,7 @@ import java.util.Map;
  */
 
 public class DispatchBuddyFirebaseMessagingService extends FirebaseMessagingService {
-    private final String TAG = "FCM";
+    private final String TAG = "FMS";
     private Context context;
 
     // https://github.com/firebase/quickstart-android/blob/master/messaging/app/src/main/java/com/google/firebase/quickstart/fcm/MyFirebaseMessagingService.java
@@ -71,6 +71,11 @@ public class DispatchBuddyFirebaseMessagingService extends FirebaseMessagingServ
 
         if (!ActivityMain.isActivityVisible()) {
             Intent i = new Intent(DispatchBuddyFirebaseMessagingService.this, ActivityMain.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|
+                       Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            i.putExtra("nature", nature);
+            i.putExtra("address", address);
+            i.putExtra("isotimestamp", isotimestamp);
             startActivity(i);
         }
     }
