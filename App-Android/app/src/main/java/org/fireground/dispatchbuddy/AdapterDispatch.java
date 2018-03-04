@@ -23,7 +23,6 @@ import java.util.List;
 
 public class AdapterDispatch extends RecyclerView.Adapter<AdapterDispatch.ViewHolderDispatch> {
     final private String TAG = "DA";
-    final private DispatchBuddyBase DBB = DispatchBuddyBase.getInstance();
 
     private List<ModelDispatch> modelDispatchList;
     private String s;
