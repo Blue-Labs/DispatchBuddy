@@ -1,6 +1,8 @@
 package org.fireground.dispatchbuddy;
 
+import android.support.v7.util.SortedList;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.util.SortedListAdapterCallback;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -10,6 +12,7 @@ import android.widget.TextView;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -24,7 +27,6 @@ import java.util.List;
 public class AdapterDispatch extends RecyclerView.Adapter<AdapterDispatch.ViewHolderDispatch> {
     final private String TAG = "DA";
 
-    private List<ModelDispatch> modelDispatchList;
     private String s;
     private Date d;
     private String short_datetime;
@@ -32,9 +34,66 @@ public class AdapterDispatch extends RecyclerView.Adapter<AdapterDispatch.ViewHo
     private SimpleDateFormat sdfformatter = new SimpleDateFormat("MMM d''yy\n h:mma");
     CustomItemClickListener listener;
 
-    public AdapterDispatch(List<ModelDispatch> modelDispatchList, CustomItemClickListener listener) {
-        this.modelDispatchList = modelDispatchList;
+//    private List<ModelDispatch> modelDispatchList;
+    SortedList<ModelDispatch> mData;
+
+    public AdapterDispatch(ArrayList<ModelDispatch> list, CustomItemClickListener listener) {
         this.listener = listener;
+
+        Log.e(TAG, "started up AdapterDispatch, size:"+list.size());
+
+        mData = new SortedList<ModelDispatch>(ModelDispatch.class, new SortedListAdapterCallback<ModelDispatch>(this) {
+
+            @Override
+            public int compare(ModelDispatch t0, ModelDispatch t1) {
+                if (t0 == null) {
+                    return 1;
+                }
+                if (t1 == null) {
+                    return -1;
+                }
+
+                if (!t0.getIsotimestamp().equals(t1.getIsotimestamp())) {
+                    return t0.getIsotimestamp().compareToIgnoreCase(t1.getIsotimestamp());
+                }
+
+                if (!t0.getIncident_number().equals(t1.getIncident_number())) {
+                    return t0.getIncident_number().compareToIgnoreCase(t1.getIncident_number());
+                }
+
+                if (!t0.getAddress().equals(t1.getAddress())) {
+                    return t0.getAddress().compareToIgnoreCase(t1.getAddress());
+                }
+
+                return 0;
+            }
+
+            // todo: why..
+            @Override
+            public boolean areContentsTheSame(ModelDispatch oldItem,
+                                              ModelDispatch newItem) {
+                return oldItem.getIsotimestamp().equals(newItem.getIsotimestamp()) &&
+                       oldItem.getIncident_number().equals(newItem.getIncident_number()) &&
+                       oldItem.getAddress().equals(newItem.getAddress()
+                       );
+            }
+
+            @Override
+            public boolean areItemsTheSame(ModelDispatch item1, ModelDispatch item2) {
+                return item1.getIsotimestamp().equals(item2.getIsotimestamp());
+            }
+        });
+
+        for (ModelDispatch dispatch : list) {
+            Log.i(TAG, "adding dispatch: "+dispatch.getKey());
+            mData.add(dispatch);
+        }
+
+    }
+
+    @Override
+    public int getItemCount() {
+        return mData.size();
     }
 
     @Override
@@ -61,11 +120,6 @@ public class AdapterDispatch extends RecyclerView.Adapter<AdapterDispatch.ViewHo
         return mViewHolder;
     }
 
-    @Override
-    public int getItemCount() {
-        return modelDispatchList.size();
-    }
-
     public static class ViewHolderDispatch extends RecyclerView.ViewHolder {
         ImageView scenario_type;
         TextView firebaseKey, address, timestamp, cross, nature, responderCount;
@@ -87,19 +141,12 @@ public class AdapterDispatch extends RecyclerView.Adapter<AdapterDispatch.ViewHo
 
     @Override
     public void onBindViewHolder(ViewHolderDispatch holder, int position) {
-        ModelDispatch dispatch = modelDispatchList.get(position);
+        ModelDispatch dispatch = mData.get(position);
 
         // use this to store the firebase key?
         holder.item.setTag(dispatch.getKey());
 
-        int apos = holder.getAdapterPosition();
-//        Log.i(TAG, "adapter position is set to "+apos+" for "+dispatch.getKey()+"/"+dispatch.getAddress());
         dispatch.setAdapterPosition(holder.getAdapterPosition());
-//        Log.i(TAG, "confirming adapter position: "+dispatch.getAdapterPosition());
-//        Log.e(TAG, "d:"+dispatch.getKey()+" itemID:"+holder.getItemId());
-//        Log.e(TAG, "d:"+dispatch.getKey()+" adapterPos:"+holder.getAdapterPosition());
-
-        // TODO: new items added AFTER initial load have the grayed out background
 
         if (dispatch.nature.contentEquals("RESCUE EMS CALL")) {
             holder.scenario_type.setImageResource(R.mipmap.ic_rescue_ems_foreground);

@@ -50,6 +50,7 @@ import com.google.firebase.database.ValueEventListener;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -75,7 +76,7 @@ public class ActivityDispatches extends DispatchBuddyBase implements
     Query dispatch_status_query;
 
     private RecyclerView recyclerView;
-    private List<ModelDispatch> dispatches;
+    private ArrayList<ModelDispatch> dispatches;
     public static List<ModelDispatchStatus> dispatch_statuses;
     private AdapterDispatch adapter;
     private AdapterDispatchStatus statusAdapter;
@@ -171,7 +172,9 @@ public class ActivityDispatches extends DispatchBuddyBase implements
                 if (model != null) {
                     model.setKey(dataSnapshot.getKey());
                     dispatches.add(model);
-                    adapter.notifyDataSetChanged();
+                    adapter.mData.add(model);
+                    Log.i(TAG, "added dispatch model for "+dataSnapshot.getKey());
+//                    adapter.notifyDataSetChanged();
                     checkIfEmpty();
 
                     // TODO this mini builder should become its own method
@@ -221,7 +224,8 @@ public class ActivityDispatches extends DispatchBuddyBase implements
                 model.setRespondingPersonnel(old.getRespondingPersonnel());
 
                 dispatches.set(getDispatchItemIndex(model), model);
-                adapter.notifyItemChanged(model.getAdapterPosition());
+                adapter.mData.updateItemAt(getDispatchItemIndex(model), model);
+//                adapter.notifyItemChanged(model.getAdapterPosition());
 
                 Integer priority = 0;
                 String msgType = model.getMsgtype();
@@ -269,6 +273,7 @@ public class ActivityDispatches extends DispatchBuddyBase implements
 
                 dispatches.remove(getDispatchItemIndex(model));
                 checkIfEmpty();
+                adapter.mData.remove(model);
             }
 
             @Override
@@ -290,6 +295,7 @@ public class ActivityDispatches extends DispatchBuddyBase implements
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
 //                Log.d(TAG, "initial data load of dispatches completed");
+                adapter.mData.addAll(dispatches);
 
                 dispatch_status_query.addChildEventListener(new ChildEventListener() {
                     @Override
@@ -770,7 +776,11 @@ public class ActivityDispatches extends DispatchBuddyBase implements
         rv.setHasFixedSize(true);
         rv.setLayoutManager(llm);
 
-        // stop using this
+        // stop using this. this is a list of email addresses. we want to connect to our live
+        // firebase personnel table, and the dispatch model's Responders. this way live
+        // updates will happen
+        //
+        // this --v  is a static list, built everytime a click is observed. :-(
         final ArrayList<String> list = new ArrayList<>();
         for(Map.Entry<String, RespondingPersonnel> entry: dispatch.getRespondingPersonnel().entrySet()) {
             Log.e(TAG, dispatch.getAddress()+" responder: "+String.valueOf(entry.getValue()));
@@ -782,17 +792,21 @@ public class ActivityDispatches extends DispatchBuddyBase implements
                 new CustomItemClickListener() {
             @Override
             public void onItemClick(View v, int position) {
-                dispatchesItemOnClick(dispatches.get(position));
+//                dispatchResponderOnClick(list.get(position));
             }
 
             @Override
             public boolean onItemLongClick(View v, int position) {
-                dispatchesLongpressDialog(dispatches.get(position));
+//                dispatchesLongpressDialog(dispatches.get(position));
                 return true;
             }
         });
 
         rv.setAdapter(respondersAdapter);
+    }
+
+    public void dispatchResponderOnClick(final ModelPersonnel model) {
+
     }
 
     // todo: some phones show this dialog with very dimmed for the map, the "fix" will take a lot
