@@ -1,5 +1,6 @@
 package org.fireground.dispatchbuddy;
 
+import android.app.Activity;
 import android.app.Dialog;
 import android.app.NotificationManager;
 import android.content.Context;
@@ -7,19 +8,20 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.Manifest;
 import android.media.AudioManager;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
-import android.support.v7.app.AppCompatActivity;
+import android.support.v4.content.PermissionChecker;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckedTextView;
+import android.widget.CompoundButton;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.support.v7.widget.Toolbar;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
@@ -27,7 +29,9 @@ import com.google.android.gms.common.GoogleApiAvailability;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,15 +40,16 @@ import java.util.Map;
  * TODO: ask user for priority permissions to emit alert sounds even when DND is on
  *       (done, but requires hitting return arrow)
  * TODO: make dispatch noise for notification alert
- *       (still playing default sound, not mp3)
- * TODO: make icons for notifications
- * TODO: make a general DispatchBuddy icon
+ *       (still playing default sound, not smvfd tones mp3)
+ * TODO: make [better] icons for notifications
+ * TODO: make a [better] general DispatchBuddy icon
  * TODO: refactor dispatches arraylist into sortedlist like personnel
  * TODO: make toolbar menu active on every activity
  * TODO: recolor "alarm fire sounding" icon for pale smoke
  * TODO: scale toolbar icon down a pinch, it's a bit big
- * TODO: toolbar version is cut off on thin phones
  * TODO: cache drive route directions for ~10 minutes
+ * TODO: redo the onClick for dispatches so users can tap on the personnel icon for personnel list, and get detailed incident data if tapping elsewhere
+ * TODO: the name set in NotificationCategory is a bit wrong, needs to get fixed
  *
  *
  * notes:
@@ -56,91 +61,73 @@ import java.util.Map;
  *
  */
 
-public class ActivityMain extends AppCompatActivity {
-    private static Context context;
-    PowerManager powerManager;
-
+public class ActivityMain extends DispatchBuddyBase {
     final private String TAG = "MAIN";
-    private static final int ERROR_DIALOG_REQUEST=9001;
 
     private static Boolean activityVisible = false;
-
-    private DispatchBuddyBase DBB;
-    private DBVolley V;
 
     private Map<String, Boolean> permissions = new HashMap<>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // do this before setting contentview .. still not working -__-
-        windowAndPower.setWindowParameters(this);
-
-        context = getApplicationContext();
-        DBB = DispatchBuddyBase.getInstance();
-        DBB.setAppContext(this.getApplicationContext());
-
-        V = DBVolley.getInstance(this.getApplicationContext());
-
-        // see https://stackoverflow.com/questions/6762671/how-to-lock-the-screen-of-an-android-device
-//        powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
-//        PowerManager.WakeLock wl = manager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Your Tag");
-//        wl.acquire();
-//        wl.release();
-
-        setContentView(R.layout.activity_main);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.app_bar); // the filename, not the ID
-        setSupportActionBar(toolbar);
 
         Log.i(TAG, "checking needed permissions");
         testServicesAndPermissions();
 
-        if (iHaveNeededPermissions()) {
-            Button doLogin = (Button) findViewById(R.id.doLogin);
-            doLogin.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    startActivity(new Intent(ActivityMain.this, LoginActivity.class));
+        Button doLogin = (Button) findViewById(R.id.doLogin);
+        doLogin.setClickable(getUser() == null);
+        doLogin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (getUser() != null) {
+                    Toast.makeText(context, "Already logged in", Toast.LENGTH_SHORT).show();
                 }
-            });
-
-            Button doDispatches = (Button) findViewById(R.id.doDispatches);
-            doDispatches.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    startActivity(new Intent(ActivityMain.this, ActivityDispatches.class));
-                }
-            });
-
-            if (DBB.getUser()!=null) {
-                Log.i(TAG, "startup with DBB user: "+DBB.getUser());
-                // pushing reg will happen 2x on Login, just deal with it until the singleton is finished
-                DBB.pushFirebaseClientRegistrationData(DBB.getRegToken());
-
-                TextView mLoggedInUser = findViewById(R.id.loggedInUser);
-                mLoggedInUser.setText(DBB.getUser());
-
-                // fetch our list of user meta-data
-                DBB.getAllPersonnel();
-
-                Intent i = new Intent(this, ActivityDispatches.class);
-                startActivity(i);
-            } else {
-                Intent i = new Intent(this, LoginActivity.class);
-                startActivity(i);
+                startActivity(new Intent(ActivityMain.this, LoginActivity.class));
             }
+        });
+
+        Button doDispatches = (Button) findViewById(R.id.doDispatches);
+        doDispatches.setClickable(getUser() != null);
+        doDispatches.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (getUser() != null) {
+                    startActivity(new Intent(ActivityMain.this, ActivityDispatches.class));
+                } else {
+                    Toast.makeText(context, "Login please", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        if (getUser()!=null) {
+            Log.i(TAG, "startup with user: "+getUser());
+            // pushing reg will happen 2x on Login, just deal with it until the singleton is finished
+            pushFirebaseClientRegistrationData(getRegToken());
+
+            TextView mLoggedInUser = findViewById(R.id.loggedInUser);
+            mLoggedInUser.setText(getUser());
+
+            if (!iHaveNeededPermissions()) {
+                Toast.makeText(context, "Probably want to enable permissions...", Toast.LENGTH_LONG).show();
+            }
+
+            // fetch our list of user meta-data
+            getAllPersonnel();
+
+            Intent i = new Intent(this, ActivityDispatches.class);
+            startActivity(i);
         } else {
-            Toast.makeText(this, "Not all desired permissions were granted, some things won't work for you", Toast.LENGTH_SHORT).show();
+            Intent i = new Intent(this, LoginActivity.class);
+            startActivity(i);
         }
     }
 
     private Boolean iHaveNeededPermissions() {
         Boolean isGood = true;
-        Log.d(TAG, "permissions map: "+permissions.toString());
         for (String key: permissions.keySet()) {
             if (!permissions.get(key)) {
                 isGood=false;
-                Toast.makeText(this, key+" needed", Toast.LENGTH_SHORT).show();
             }
         }
         return isGood;
@@ -157,7 +144,7 @@ public class ActivityMain extends AppCompatActivity {
                 if (ActivityCompat.shouldShowRequestPermissionRationale(this, permission)) {
                     Toast.makeText(this, permission+" permission previously denied", Toast.LENGTH_SHORT).show();
                 }
-                if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+                if (!hasPermission(this, permission)) {
                     return false;
                 }
             }
@@ -166,70 +153,128 @@ public class ActivityMain extends AppCompatActivity {
     }
 
     private void testServicesAndPermissions(){
-        permissions.put("googleApi", false);
-        permissions.put("notificationPermissions", false);
+        // not really a permission.. a very necessary service, todo it
+        Boolean google = isGoogleApiServicesGood(ActivityMain.this);
+        permissions.put("googleApi", google);
+        CheckedTextView gbox = findViewById(R.id.googlePlayServicesCheckbox);
+        Log.i(TAG, "setting gApi checkbox: "+google);
+        gbox.setChecked(google);
 
-        int available = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(ActivityMain.this);
-        Log.d(TAG, "Google play services version: "+GoogleApiAvailability.GOOGLE_PLAY_SERVICES_VERSION_CODE);
-        if (available == ConnectionResult.SUCCESS) {
-            Log.i(TAG, "Google Play Services is ok");
-            permissions.put("googleApi", true);
-        } else if (GoogleApiAvailability.getInstance().isUserResolvableError(available)) {
-            Log.w(TAG, "Google Play Services error occurred but we can fix it");
-            Dialog dialog = GoogleApiAvailability.getInstance().getErrorDialog(ActivityMain.this, available, ERROR_DIALOG_REQUEST);
-            dialog.show();
-            GoogleApiAvailability.getInstance().makeGooglePlayServicesAvailable(this);
-            // hope that fixed it buddy!
-            permissions.put("googleApi", true);
-        } else {
-            Log.w(TAG, "Google Play Services is unfixable, cannot make it go!");
-            Toast.makeText(this, "Google API services not available, parts of DispatchBuddy won't work for you", Toast.LENGTH_SHORT).show();
-            permissions.put("googleApi", false);
-        }
+        // this svg drawable isn't working todo fix it and put original back into xml file
+//        if (google) {
+//            gbox.setCheckMarkDrawable(R.drawable.ic_green_check_box);
+//        } else {
+//            gbox.setCheckMarkDrawable(R.drawable.ic_red_check_box);
+//        }
 
-        // special permission case
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            try {
-                NotificationManager n = (NotificationManager) getApplicationContext().getSystemService(Context.NOTIFICATION_SERVICE);
-                if (n.isNotificationPolicyAccessGranted()) {
-                    permissions.put("notificationPermissions", true);
-                    AudioManager audioManager = (AudioManager) getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
-                    //audioManager.setRingerMode(AudioManager.RINGER_MODE_SILENT);
-                } else {
-                    // Ask the user to grant access
-                    permissions.put("notificationPermissions", false);
-                    Toast.makeText(this, "DispatchBuddy needs Notification Policy Access", Toast.LENGTH_SHORT).show();
-                    Intent intent = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
-                    startActivityForResult(intent, 99);
-                }
-            } catch (NoSuchMethodError e) {
-                Log.w(TAG, "can't use isNotificationPolicyAccessGranted on this platform");
-                // pretend it's ok
-                permissions.put("notificationPermissions", true);
-            }
-        } else {
-            // pretend it's ok
-            permissions.put("notificationPermissions", true);
-        }
 
         int PERMISSION_REQUEST_ID = 98;
         /*Manifest.permission.WRITE_EXTERNAL_STORAGE*/
         String[] PERMISSIONS = {
-                Manifest.permission.ACCESS_FINE_LOCATION
+                Manifest.permission.ACCESS_NOTIFICATION_POLICY
                 , Manifest.permission.ACCESS_COARSE_LOCATION
+                , Manifest.permission.ACCESS_FINE_LOCATION
+                , Manifest.permission.CAMERA
         };
 
-        if(!hasPermissions(this, PERMISSIONS)){
-            Toast.makeText(this, "Requesting for popup style permissions", Toast.LENGTH_SHORT).show();
-            ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_REQUEST_ID);
+        for (String permission: PERMISSIONS) {
+            Switch sw = getPermissionSwitchViewID(permission);
+            sw.setOnCheckedChangeListener(switchListener);
+            sw.setOnTouchListener(new View.OnTouchListener() {
+                @Override
+                public boolean onTouch(View v, MotionEvent event) {
+                    switch (event.getAction()) {
+                        case MotionEvent.ACTION_UP: {
+                            Switch _sw = findViewById(v.getId());
+                            String _perm = getResources().getResourceName(v.getId());
+
+                            _perm = _perm.substring(_perm.lastIndexOf('/') + 7);
+                            ArrayList<Character> _perm_ex = new ArrayList<>();
+
+                            for (int x = 0; x < _perm.length() - 1; x++) {
+                                _perm_ex.add(_perm.charAt(x));
+                                if (Character.isUpperCase(_perm.charAt(x + 1))) {
+                                    _perm_ex.add('_');
+                                }
+                            }
+                            _perm_ex.add(_perm.charAt(_perm.length() - 1));
+
+                            StringBuilder sb = new StringBuilder();
+                            for (Character c : _perm_ex) {
+                                sb.append(c);
+                            }
+
+                            // todo: gotta be a better way to do this
+                            _perm =  "android.permission." +sb.toString().toUpperCase();
+
+                            // check if we need to call Settings
+                            Boolean state = null;
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                Boolean doSettings = (ActivityCompat.checkSelfPermission(context, _perm) == PackageManager.PERMISSION_GRANTED) == _sw.isChecked();
+                                if (doSettings) {
+                                    ActivityCompat.requestPermissions(ActivityMain.this, new String[]{_perm}, PERMISSION_REQUEST_ID);
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                }
+            });
+
+            Boolean state = null;
+            // https://stackoverflow.com/questions/37428464/how-can-i-check-permission-under-api-level-23
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Integer foo = ActivityCompat.checkSelfPermission(context, permission);
+                state = ActivityCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED;
+            } else {
+                // below API 23, permission is always granted based on the manifest. this... isn't needed, but it's here
+                // for reference
+                state = PermissionChecker.checkSelfPermission(context, permission) == PermissionChecker.PERMISSION_GRANTED;
+            }
+            sw.setChecked(state);
+
+            permissions.put(permission, state);
         }
     }
+
+    private Switch getPermissionSwitchViewID(String opermission) {
+
+//        Log.w(TAG, "operating from: "+opermission);
+        String permission = opermission.substring(opermission.lastIndexOf('.') + 1).replace("_", " ");
+        permission = toTitleCase(permission);
+        permission = permission.replace(" ", "");
+
+        Integer id = getResources().getIdentifier("switch"+permission, "id", getPackageName());
+        Switch sw = (Switch) findViewById(id);
+        return sw;
+    }
+
+    public static String toTitleCase(String givenString) {
+        String[] arr = givenString.toLowerCase().split(" ");
+        StringBuffer sb = new StringBuffer();
+
+        for (int i = 0; i < arr.length; i++) {
+            sb.append(Character.toUpperCase(arr[i].charAt(0)))
+                    .append(arr[i].substring(1)).append(" ");
+        }
+        return sb.toString().trim();
+    }
+
+    CompoundButton.OnCheckedChangeListener switchListener = new CompoundButton.OnCheckedChangeListener() {
+        // not used, here for reference
+        public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+            if (isChecked) {
+                Log.i(TAG, "SWITCH ON");
+            } else {
+                Log.i(TAG, "SWITCH OFF");
+            }
+        }
+    };
 
     @Override
     protected void onResume() {
         super.onResume();
         activityVisible = true;
-        context = getApplicationContext();
 
         // https://stackoverflow.com/questions/40259780/wake-up-device-programmatically
 //        KeyguardManager manager = (KeyguardManager) this.getSystemService(Context.KEYGUARD_SERVICE);
@@ -247,6 +292,8 @@ public class ActivityMain extends AppCompatActivity {
                     Log.i(TAG, "bundle data: "+object.toString());
                 } catch (JSONException e) {
                     e.printStackTrace();
+                } catch (NullPointerException e) {
+                    //
                 }
             } else {
                 Log.i(TAG, "extras is null");
@@ -254,20 +301,20 @@ public class ActivityMain extends AppCompatActivity {
         } else {
             Log.i(TAG, "getIntet() is null");
         }
+
+        testServicesAndPermissions();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         activityVisible = false;
-        context = null;
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         activityVisible = false;
-        context = null;
     }
 
     public static Boolean isActivityVisible() {
@@ -327,88 +374,13 @@ public class ActivityMain extends AppCompatActivity {
         }
 
         switch (requestCode) {
-//            case MY_PERMISSIONS_REQUEST_READ_CONTACTS: {
-//                // If request is cancelled, the result arrays are empty.
-//                if (grantResults.length > 0
-//                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-//
-//                    // permission was granted, yay! Do the
-//                    // contacts-related task you need to do.
-//
-//                } else {
-//
-//                    // permission denied, boo! Disable the
-//                    // functionality that depends on this permission.
-//                }
-//                return;
-//            }
-
             case 98: {
                 for(int n=0; n<_permissions.length; n++) {
                     permissions.put(_permissions[n], grantResults[n]==PackageManager.PERMISSION_GRANTED);
-                    Log.w(TAG, "  request perm: "+_permissions[n]+", grant result: "+grantResults[n]);
+                    Log.d(TAG, "  request perm: "+_permissions[n]+", grant result: "+grantResults[n]);
                 }
             }
-
-            case 10: {
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Log.i(TAG, "oAR permission granted");
-                    // awesome
-                    finish();
-                    startActivity(new Intent(this, ActivityMain.class));
-                } else {
-                    Toast.makeText(this, "Without priority notification access, DispatchBuddy cannot override Do Not Disturb mode", Toast.LENGTH_LONG).show();
-                }
-            }
-
-            // other 'case' lines to check for other
-            // permissions this app might request.
         }
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        Log.e(TAG, "inflating menu");
-        return super.onCreateOptionsMenu(menu);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.appLogout:
-                DBB.logOut();
-                TextView mLoggedInUser = findViewById(R.id.loggedInUser);
-                mLoggedInUser.setText("");
-
-                startActivity(new Intent(this, LoginActivity.class));
-                break;
-            case R.id.appSettings:
-                //Intent intent = new Intent(this, xSettingsActivity.class);
-                //startActivity(intent);
-                //break;
-            case R.id.appSearch:
-                //Intent intent = new Intent(this, appSearch.class);
-                //startActivity(intent);
-                //break;
-            case R.id.appCheckUpdates:
-                //Intent intent = new Intent(this, appCheckUpdates.class);
-                //startActivity(intent);
-                //break;
-            case R.id.appFeedback:
-                //Intent intent = new Intent(this, appFeedback.class);
-                //startActivity(intent);
-                //break;
-            case R.id.changePassword:
-                //Intent intent = new Intent(this, appChangePassword.class);
-                //startActivity(intent);
-                //break;
-            default:
-                Toast.makeText(this, "not implemented yet",
-                        Toast.LENGTH_SHORT).show();
-//                Log.e(TAG, "wtf mate, unknown menu item");
-        }
-        return super.onOptionsItemSelected(item);
-    }
 }
