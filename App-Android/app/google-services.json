@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "140492930787-b2182brelv24ammo1s54a9052fm45jh6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "org.fireground.dispatchbuddy",
+            "certificate_hash": "27627c55fec50225f976846c172ba485317bab06"
+          }
+        },
+        {
           "client_id": "140492930787-2ilet9dihg15luf2lcufl827o33ocl04.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
