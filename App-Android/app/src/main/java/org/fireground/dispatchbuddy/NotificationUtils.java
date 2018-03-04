@@ -1,5 +1,6 @@
 package org.fireground.dispatchbuddy;
 
+import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -17,20 +18,38 @@ import android.os.Build;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.widget.Toast;
 
+import java.io.InputStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
 /**
  * Created by david on 2/12/18.
  *
+ *
+ 03-03 06:51:56.914 W/MediaPlayer: Couldn't open android.resource://org.fireground.dispatchbuddy/raw/sm_dispatch.mp3: java.io.FileNotFoundException: No resource found for: android.resource://org.fireground.dispatchbuddy/raw/sm_dispatch.mp3
+ 03-03 06:51:56.914 D/NuPlayerDriver: NuPlayerDriver(0xb23c82a0) created, clientPid(1854)
+ 03-03 06:51:56.921 E/FileSource: Failed to open file 'android.resource://org.fireground.dispatchbuddy/raw/sm_dispatch.mp3'. (No such file or directory)
+ 03-03 06:51:56.921 E/GenericSource: Failed to create data source!
+ 03-03 06:51:56.921 D/NuPlayerDriver: notifyListener_l(0xb23c82a0), (100, 1, -2147483648, -1), loop setting(0, 0)
+ 03-03 06:51:56.921 E/MediaPlayerNative: error (1, -2147483648)
+ 03-03 06:51:56.921 W/RingtonePlayer: error loading sound for android.resource://org.fireground.dispatchbuddy/raw/sm_dispatch.mp3
+ java.io.IOException: Prepare failed.: status=0x1
+ at android.media.MediaPlayer._prepare(Native Method)
+ at android.media.MediaPlayer.prepare(MediaPlayer.java:1259)
+ at com.android.systemui.media.NotificationPlayer$CreationAndCompletionThread.run(NotificationPlayer.java:96)
+ 03-03 06:51:56.934 D/EGL_emulation: eglMakeCurrent: 0xa2485900: ver 2 0 (tinfo 0xa2483f00)
  */
+
+
 
 public class NotificationUtils extends ContextWrapper {
     private String TAG = "NU";
     private NotificationManager mManager;
     private NotificationCompat.Builder nb;
-    public static final String ANDROID_CHANNEL_ID = "com.fireground.org.org.fireground.dispatchbuddy.ANDROID";
+    public static final String ANDROID_CHANNEL_ID_HIGH = "com.fireground.org.org.fireground.dispatchbuddy.HIGH";
+    public static final String ANDROID_CHANNEL_ID_DEFAULT = "com.fireground.org.org.fireground.dispatchbuddy.DEFAULT";
     public static final String ANDROID_CHANNEL_NAME = "DispatchBuddy Alerts";
     private final long[] vibrationScheme = new long[]{100, 200, 300, 400, 500, 400, 300, 200, 400};
     private SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -38,6 +57,10 @@ public class NotificationUtils extends ContextWrapper {
     public NotificationUtils(Context base) {
         super(base);
 
+        /*
+         * important bits for .O+
+         * https://developer.android.com/guide/topics/ui/notifiers/notifications.html#ManageChannels
+         */
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             Log.i(TAG, "creating a notification channel");
 
@@ -48,29 +71,52 @@ public class NotificationUtils extends ContextWrapper {
                     .build();
 
             Uri alarmSound = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE
-                    + "://" + getPackageName() + "raw/sm_dispatch.mp3");
+                    + "://" + getPackageName() + "/" + R.raw.sm_dispatch);
 
             // Create the channel object with the unique ID MY_CHANNEL
-            NotificationChannel myChannel =
+            // todo: do i need an ANDROID_CHANNEL_ID_LOWPRIORITY and HIGHPRIORITY, one with smvfd tones, one with plink? yes
+            NotificationChannel highPriorityChannel =
                     new NotificationChannel(
-                            ANDROID_CHANNEL_ID,
-                            getResources().getString(R.string.appName),
-                            NotificationManager.IMPORTANCE_HIGH); // maybe IMPORTANCE_MAX isn't allowed here?
+                            ANDROID_CHANNEL_ID_HIGH,
+                            getResources().getString(R.string.appName)+" Dispatches",
+                            NotificationManager.IMPORTANCE_HIGH);
 
-            // Configure the channel's initial settings
-            myChannel.enableLights(true);
-            myChannel.enableVibration(true);
-            myChannel.setLightColor(0xffff0000);
-            myChannel.setBypassDnd(true);
-            myChannel.setShowBadge(true);
-            myChannel.setDescription("@string/appName");
-            myChannel.setName("@string/appName");
-            myChannel.setVibrationPattern(vibrationScheme);
-            myChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-            myChannel.setSound(alarmSound, att);
+            highPriorityChannel.enableLights(true);
+            highPriorityChannel.enableVibration(true);
+            highPriorityChannel.setLightColor(0xffff0000);
+            highPriorityChannel.setBypassDnd(true);
+            highPriorityChannel.setShowBadge(true);
+            highPriorityChannel.setDescription("High priority messages");
+            highPriorityChannel.setName("Dispatches");
+            highPriorityChannel.setVibrationPattern(vibrationScheme);
+            highPriorityChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            highPriorityChannel.setSound(alarmSound, att);
+
+            Log.w(TAG, "high priority channel can bypass dnd: "+highPriorityChannel.canBypassDnd());
 
             // Submit the notification channel object to the notification manager
-            getManager().createNotificationChannel(myChannel);
+            getManager().createNotificationChannel(highPriorityChannel);
+
+            NotificationChannel defaultPriorityChannel =
+                    new NotificationChannel(
+                            ANDROID_CHANNEL_ID_DEFAULT,
+                            getResources().getString(R.string.appName)+" Messages",
+                            NotificationManager.IMPORTANCE_DEFAULT);
+
+            // Configure the channel's initial settings
+            defaultPriorityChannel.enableLights(true);
+            defaultPriorityChannel.enableVibration(true);
+            defaultPriorityChannel.setLightColor(0xffff0000);
+            defaultPriorityChannel.setBypassDnd(false);
+            defaultPriorityChannel.setShowBadge(true);
+            defaultPriorityChannel.setDescription("Low priority messages");
+            defaultPriorityChannel.setName("messages and updates");
+            defaultPriorityChannel.setVibrationPattern(vibrationScheme);
+            defaultPriorityChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            //defaultPriorityChannel.setSound(null, att);
+
+            // Submit the notification channel object to the notification manager
+            getManager().createNotificationChannel(defaultPriorityChannel);
         }
     }
 
@@ -96,7 +142,9 @@ public class NotificationUtils extends ContextWrapper {
         // todo: with config setting, use setFullScreenIntent()
         // todo: review setPublicVersion
 //                .setDefaults(Notification.DEFAULT_ALL)
-        NotificationCompat.Builder n = new NotificationCompat.Builder(getApplicationContext(), ANDROID_CHANNEL_ID)
+        String CH_ID = priority == NotificationCompat.PRIORITY_HIGH ? ANDROID_CHANNEL_ID_HIGH:ANDROID_CHANNEL_ID_DEFAULT;
+
+        NotificationCompat.Builder n = new NotificationCompat.Builder(getApplicationContext(), CH_ID)
                 .setPriority(priority)
                 .setSmallIcon(R.mipmap.ic_dispatchbuddy_foreground)
                 .setLargeIcon(BitmapFactory.decodeResource(this.getResources(), R.mipmap.ic_launcher))
@@ -120,7 +168,7 @@ public class NotificationUtils extends ContextWrapper {
                 Log.i(TAG, "applying mp3 dispatch tone");
                 n.setSound(Uri.parse("android.resource://"+this.getPackageName()+"/"+R.raw.sm_dispatch));
             } else {
-                Log.i(TAG, "NOT applying mp3 dispatch tone");
+                Log.i(TAG, "NOT applying mp3 dispatch tone due to Build.VERSION, should play in channel instead");
             }
         }
         n.setGroup(isotimestamp);
@@ -143,6 +191,9 @@ public class NotificationUtils extends ContextWrapper {
         return mManager;
     }
 
+    // todo: why is this suppression needed?
+
+    @SuppressLint("WrongConstant")
     public void sendNotification(String nature, String address, Integer priority, String isotimestamp, Boolean groupSummary) {
         /*
          * isotimestamp is used as the notification group key
@@ -168,7 +219,12 @@ public class NotificationUtils extends ContextWrapper {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             previousNotificationInterruptSetting = mManager.getCurrentInterruptionFilter();
-            mManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY);
+            if (mManager.isNotificationPolicyAccessGranted()) {
+                mManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY);
+            } else {
+                // can't do this, need Activity context
+//                Toast.makeText(this, "Note, cannot modify DnD. Check Override Do Not Disturb under Settings -> Apps & notifications -> App info -> DispatchBuddy -> App notifications -> Categories (click) -> Override Do Not Disturb", Toast.LENGTH_LONG).show();
+            }
         }
 
         if (currentMode != AudioManager.RINGER_MODE_NORMAL) {
@@ -188,7 +244,9 @@ public class NotificationUtils extends ContextWrapper {
         Log.i("sN:", "notification emitted, group: "+isotimestamp);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            mManager.setInterruptionFilter(previousNotificationInterruptSetting);
+            if (mManager.isNotificationPolicyAccessGranted()) {
+                mManager.setInterruptionFilter(previousNotificationInterruptSetting);
+            }
         }
 
         // do i need to wait until some future time?
