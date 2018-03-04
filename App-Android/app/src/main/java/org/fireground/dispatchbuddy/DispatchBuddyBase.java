@@ -1,12 +1,25 @@
 package org.fireground.dispatchbuddy;
 
+import android.app.Activity;
+import android.app.Dialog;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.provider.Settings.Secure;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
@@ -14,6 +27,8 @@ import com.android.volley.toolbox.JsonObjectRequest;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.firebase.ui.storage.images.FirebaseImageLoader;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -40,37 +55,50 @@ import java.util.Map;
  * Created by david on 2/20/18.
  */
 
-class DispatchBuddyBase {
-    private static DispatchBuddyBase ourInstance;
-    private String TAG = "DBB";
+abstract class DispatchBuddyBase extends AppCompatActivity {
+    private static String TAG = "DBB";
 
     // track Firebase here so we don't try to init it twice
     private static FirebaseDatabase fbDatabase = null;
     private static FirebaseStorage fbStorage = null;
     private FirebaseAuth.AuthStateListener authListener;
 
-    private String FirebaseMessagingRegToken = null;
-    private String androidID = null;
-    private String user = null;
-    private String domain = null;
-    private Boolean debug;
+    private DBVolley V;
 
-    // used to get AndroidID and to check if this is a debug or release build
-    private Context context;
+    private static String FirebaseMessagingRegToken = null;
+    private static String user = null;
+    private static String domain = null;
+    private static String androidID = null;
 
-    public void setAppContext(Context context) {
-        this.context = context;
-    }
+    public static Context context;
+
     public Context getAppContext() { return this.context; }
 
-    public static DispatchBuddyBase getInstance() {
-        if (ourInstance == null) {
-            ourInstance = new DispatchBuddyBase();
-        }
-        return ourInstance;
+    public DispatchBuddyBase getInstance() {
+        return this;
     }
 
-    private DispatchBuddyBase() {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // do this before setting contentview .. still not working -__-
+        windowAndPower.setWindowParameters(this);
+
+        context = getApplicationContext();
+
+        V = DBVolley.getInstance(this.getApplicationContext());
+
+        // see https://stackoverflow.com/questions/6762671/how-to-lock-the-screen-of-an-android-device
+//        powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+//        PowerManager.WakeLock wl = manager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Your Tag");
+//        wl.acquire();
+//        wl.release();
+
+        setContentView(R.layout.activity_main);
+        Toolbar toolbar = (Toolbar) findViewById(R.id.app_bar); // the filename, not the ID
+        setSupportActionBar(toolbar);
+
         // wtf Firebase, local cache is readable even without authentication, ugg!??
         if (fbDatabase == null) {
             // this is set at the first DBB instancing because it can only happen once regardless of
@@ -106,7 +134,76 @@ class DispatchBuddyBase {
         FirebaseAuth.getInstance().addAuthStateListener(authListener);
 
         FirebaseMessagingRegToken = FirebaseInstanceId.getInstance().getToken();
-        Log.d(TAG, "FBmsging token for this device is: " + FirebaseMessagingRegToken);
+//        Log.d(TAG, "FBmsging token for this device is: " + FirebaseMessagingRegToken);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.appLogout:
+                logOut();
+                TextView mLoggedInUser = findViewById(R.id.loggedInUser);
+                mLoggedInUser.setText("");
+
+                startActivity(new Intent(this, LoginActivity.class));
+                break;
+            case R.id.appSettings:
+                //Intent intent = new Intent(this, xSettingsActivity.class);
+                //startActivity(intent);
+                //break;
+            case R.id.appSearch:
+                //Intent intent = new Intent(this, appSearch.class);
+                //startActivity(intent);
+                //break;
+            case R.id.appCheckUpdates:
+                //Intent intent = new Intent(this, appCheckUpdates.class);
+                //startActivity(intent);
+                //break;
+            case R.id.appFeedback:
+                //Intent intent = new Intent(this, appFeedback.class);
+                //startActivity(intent);
+                //break;
+            case R.id.changePassword:
+                //Intent intent = new Intent(this, appChangePassword.class);
+                //startActivity(intent);
+                //break;
+            default:
+                Toast.makeText(this, "not implemented yet",
+                        Toast.LENGTH_SHORT).show();
+//                Log.e(TAG, "wtf mate, unknown menu item");
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    public boolean hasPermission(Context context, String permission) {
+        return ActivityCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private static final int ERROR_DIALOG_REQUEST=9001;
+    public Boolean isGoogleApiServicesGood(Activity activity){
+        int available = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(activity);
+        Log.d(TAG, "Google play services version: "+GoogleApiAvailability.GOOGLE_PLAY_SERVICES_VERSION_CODE);
+        if (available == ConnectionResult.SUCCESS) {
+            Log.i(TAG, "Google Play Services is ok");
+            return true;
+        } else if (GoogleApiAvailability.getInstance().isUserResolvableError(available)) {
+            Log.w(TAG, "Google Play Services error occurred but we can fix it");
+            Dialog dialog = GoogleApiAvailability.getInstance().getErrorDialog(activity, available, ERROR_DIALOG_REQUEST);
+            dialog.show();
+            GoogleApiAvailability.getInstance().makeGooglePlayServicesAvailable(this);
+            // hope that fixed it buddy!
+            return true;
+        } else {
+            Log.w(TAG, "Google Play Services is unfixable, cannot make it go!");
+            Toast.makeText(this, "Google API services not available, parts of DispatchBuddy won't work for you", Toast.LENGTH_SHORT).show();
+        }
+        return false;
     }
 
     public void logOut() {
@@ -115,7 +212,7 @@ class DispatchBuddyBase {
         this.user = null;
     }
 
-    public String getUser() {
+    public static String getUser() {
         FirebaseUser user;
         try {
             user = FirebaseAuth.getInstance().getCurrentUser();
@@ -134,18 +231,18 @@ class DispatchBuddyBase {
         }
 
         if (user != null) {
-            this.user = user.getEmail();
-            this.domain = this.user.split("@")[1].replaceAll("\\.", "_");
+            DispatchBuddyBase.user = user.getEmail();
+            DispatchBuddyBase.domain = DispatchBuddyBase.user.split("@")[1].replaceAll("\\.", "_");
         } else {
-            this.user = null;
-            this.domain = null;
+            DispatchBuddyBase.user = null;
+            DispatchBuddyBase.domain = null;
         }
 //        Log.d(TAG, "getUser returning: "+this.user);
-        return this.user;
+        return DispatchBuddyBase.user;
     }
 
-    public void pushFirebaseClientRegistrationData(String registrationToken) {
-        this.FirebaseMessagingRegToken = registrationToken;
+    public static void pushFirebaseClientRegistrationData(String registrationToken) {
+        FirebaseMessagingRegToken = registrationToken;
 
         // update device registration for user
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
@@ -159,10 +256,18 @@ class DispatchBuddyBase {
         Date date = new Date();
         SimpleDateFormat f = new SimpleDateFormat("yyyy.M.d h:mm:ss a zzz");
 
+        String phoneMeta="";
+        phoneMeta += "OS Version: " + System.getProperty("os.version") + "(" + android.os.Build.VERSION.INCREMENTAL + ") ";
+        phoneMeta += "OS API Level: " + android.os.Build.VERSION.RELEASE + "(" + android.os.Build.VERSION.SDK_INT + ") ";
+        phoneMeta += "Device: " + android.os.Build.DEVICE + " ";
+        phoneMeta += "Model (and Product): " + android.os.Build.MODEL + " ("+ android.os.Build.PRODUCT + ")";
+
         Map<String, Object> u = new HashMap<>();
         u.put("registeredUser", user.getEmail());
         u.put("firebaseMessagingRegToken", FirebaseMessagingRegToken);
         u.put("lastUpdated", f.format(date));
+        u.put("phoneMeta", phoneMeta);
+
         newRef.updateChildren(u, new DatabaseReference.CompletionListener() {
             @Override
             public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
@@ -252,7 +357,7 @@ class DispatchBuddyBase {
     /*
      * The assumption is made that the caller knows if "/" is prefixed at root level tables
      */
-    private String buildPathPrefix(String path) {
+    private static String buildPathPrefix(String path) {
         boolean isDebuggable =  ( 0 != ( context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE ) );
         if (isDebuggable) {
             path = "/debug" + path;
@@ -284,7 +389,7 @@ class DispatchBuddyBase {
         FirebaseMessaging.getInstance().subscribeToTopic(channel);
     }
 
-    public DatabaseReference getTopPathRef(String path) {
+    public static DatabaseReference getTopPathRef(String path) {
         path = buildPathPrefix(path);
 //        Log.d(TAG, "obtaining ref for: "+path);
         DatabaseReference ref = FirebaseDatabase.getInstance().getReference(path);
@@ -292,7 +397,7 @@ class DispatchBuddyBase {
         return ref;
     }
 
-    public String getRegToken() {
+    public static String getRegToken() {
         return FirebaseInstanceId.getInstance().getToken();
     }
 
@@ -301,7 +406,7 @@ class DispatchBuddyBase {
      *       our downloads can resume and be referred to next time we're alive
      *       https://firebase.google.com/docs/storage/android/download-files#handle_activity_lifecycle_changes
      */
-    public void getProfileIcon(Context context, final ImageView view, String email) {
+    public static void getProfileIcon(Context context, final ImageView view, String email) {
         DatabaseReference ref = getTopPathRef("/personnel");
 
         ref.orderByChild("email")
@@ -391,13 +496,12 @@ class DispatchBuddyBase {
                 + address
                 + "&bounds=41.509927,-72.858410|41.53740,-72.807598"
                 + "&key="
-                + this.context.getResources().getString(R.string.google_ip_address_map_api_key);
+                + this.context.getResources().getString(R.string.google_android_web_referer_api_key);
 
-        Log.d(TAG, "geocoding url: "+url);
+        Log.d(TAG, "geocoding ((( ANDROID KEY ))) url: "+url);
 
         JsonObjectRequest jsObjRequest = new JsonObjectRequest
                 (Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
-
                     @Override
                     public void onResponse(JSONObject response) {
 //                        Log.e(TAG,"Response: " + response.toString());
@@ -442,7 +546,24 @@ class DispatchBuddyBase {
                     public void onErrorResponse(VolleyError error) {
                         // TODO Auto-generated method stub
                     }
-                });
+                }) {
+
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                Map<String, String> headers = new HashMap<>();
+                        /*
+                         * there's no way to legit secure this key with restrictions in the
+                         * console. we can't restrict by ios/android type, most phones will
+                         * have wildly varying IPs per carrier proxies, ...
+                         *
+                         * actually, the googleapi doesn't permit the use of a referer for
+                         * key restrictions either! wtf!!
+                         */
+                headers.put("Referer", "https://smvfd.info/");
+                headers.putAll(super.getHeaders());
+                return headers;
+            }
+        };
 
         DBVolley.getInstance(context)
                 .addToRequestQueue(jsObjRequest);
@@ -460,7 +581,7 @@ class DispatchBuddyBase {
                 + ","
                 + destination.longitude
                 +"&key="
-                + this.context.getResources().getString(R.string.google_ip_address_map_api_key);
+                + this.context.getResources().getString(R.string.google_android_web_referer_api_key);
                 ; // probably need to put our api key in here..? we need an android method for this
                   // so we can use the android key without IP restrictions
 
@@ -483,7 +604,24 @@ class DispatchBuddyBase {
                         // TODO Auto-generated method stub
                         Log.e(TAG, "failed to fetch JSON:"+error.getLocalizedMessage());
                     }
-                });
+                }) {
+
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                Map<String, String> headers = new HashMap<>();
+                        /*
+                         * there's no way to legit secure this key with restrictions in the
+                         * console. we can't restrict by ios/android type, most phones will
+                         * have wildly varying IPs per carrier proxies, ...
+                         *
+                         * actually, the googleapi doesn't permit the use of a referer for
+                         * key restrictions either! wtf!!
+                         */
+                headers.put("Referer", "https://smvfd.info/");
+                headers.putAll(super.getHeaders());
+                return headers;
+            }
+        };
 
         DBVolley.getInstance(context)
                 .addToRequestQueue(jsObjRequest);
