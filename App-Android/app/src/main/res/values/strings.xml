@@ -28,8 +28,8 @@
     <string name="in_station">In Quarters</string>
     <string name="personnel_count">Personnel count</string>
 
-    <string name="google_android_map_api_key">AIzaSyARTZLL2K00VxoH1XkBv4YjeqWkznXXZho</string>
-    <string name="google_ip_address_map_api_key">AIzaSyAXexsV69LPaoBxE5gMPpnHS_VY7Ydm7lA</string>
+    <string name="google_android_web_referer_api_key">AIzaSyARTZLL2K00VxoH1XkBv4YjeqWkznXXZho</string>
+    <string name="google_android_map_api_key">AIzaSyAXexsV69LPaoBxE5gMPpnHS_VY7Ydm7lA</string>
     <string name="service_not_available">Google Maps service is not available</string>
 
 
@@ -37,4 +37,12 @@
     <string name="invalid_lat_long_used">Invalid Lat/Lng used</string>
     <string name="no_address_found">No address was found</string>
     <string name="address_found">address found</string>
+    <string name="permissions_needed_camera">Camera</string>
+    <string name="permissions_needed_fine_location">Fine location</string>
+    <string name="permissions_needed_coarse_location">Coarse Location</string>
+    <string name="permissions_needed_notification_policy_changes">Notification policy changes</string>
+    <string name="permissions_needed">Permissions Needed (tap to allow)</string>
+    <string name="google_play_services_is_current">Google Play Services is current</string>
+    <string name="dispatchbuddy_switches">DispatchBuddy switches</string>
+    <string name="dispatchbuddy_switches_silence_notifcations">Silence notifcations</string>
 </resources>
