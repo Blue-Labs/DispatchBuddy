@@ -23,18 +23,15 @@ import com.google.firebase.auth.FirebaseAuthException;
  * Created by david on 2/9/18.
  */
 
-public class LoginActivity extends Activity {
+public class LoginActivity extends DispatchBuddyBase {
     private static final String TAG = "LoginActivity";
     private EditText mEmailField;
     private EditText mPasswordField;
-    public DispatchBuddyBase DBB;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login);
-
-        DBB = DispatchBuddyBase.getInstance();
 
         // View elements
         mEmailField = findViewById(R.id.firegroundUsername);
@@ -59,7 +56,7 @@ public class LoginActivity extends Activity {
     public void onResume() {
         super.onResume();
         // Check if user is signed in (non-null) and update UI accordingly.
-        updateUI(DBB.getUser());
+        updateUI(getUser());
     }
 
     private void signIn(String email, String password) {
@@ -75,7 +72,7 @@ public class LoginActivity extends Activity {
                     String user;
                     @Override
                     public void onComplete(@NonNull Task<AuthResult> task) {
-                        if (task.isSuccessful()) {
+                        //if (task.isSuccessful()) {
                             // horrible bad hack.
                             // sleep for a bit, race condition in Firebase, our object from
                             // getCurrentUser() may not be fully created yet.
@@ -87,9 +84,9 @@ public class LoginActivity extends Activity {
                                         Log.e(TAG, "auth success delay starting");
                                         Thread.sleep(500);
                                         // Do some stuff
-                                        user = DBB.getUser();
+                                        user = getUser();
                                         Log.e(TAG, "auth success");
-                                        DBB.pushFirebaseClientRegistrationData(DBB.getRegToken());
+                                        pushFirebaseClientRegistrationData(getRegToken());
                                         updateUI(user);
                                     } catch (Exception e) {
                                         e.getLocalizedMessage();
@@ -98,13 +95,13 @@ public class LoginActivity extends Activity {
                             });
                             finishLogin.run();
 
-                        } else {
-                            user = null;
-                            Log.e(TAG, "auth failed");
-                            Toast.makeText(LoginActivity.this, "Authentication failed.",
-                                    Toast.LENGTH_LONG).show();
-                            updateUI(user);
-                        }
+//                        } else {
+//                            user = null;
+//                            Log.e(TAG, "auth failed");
+//                            Toast.makeText(LoginActivity.this, "Authentication failed.",
+//                                    Toast.LENGTH_LONG).show();
+//                            updateUI(user);
+//                        }
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {
@@ -129,7 +126,7 @@ public class LoginActivity extends Activity {
             mEmailField.setText(null);
             mPasswordField.setText(null);
             finish();
-            startActivity(new Intent(LoginActivity.this, ActivityDispatches.class));
+            startActivity(new Intent(LoginActivity.this, ActivityMain.class));
         }
     }
 
