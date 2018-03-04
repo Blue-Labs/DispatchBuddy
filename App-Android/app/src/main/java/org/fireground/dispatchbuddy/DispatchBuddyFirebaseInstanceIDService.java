@@ -5,6 +5,8 @@ import android.util.Log;
 import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.firebase.iid.FirebaseInstanceIdService;
 
+import static org.fireground.dispatchbuddy.DispatchBuddyBase.*;
+
 /**
  * Created by david on 2/18/18.
  */
@@ -15,15 +17,12 @@ import com.google.firebase.iid.FirebaseInstanceIdService;
  * inside DBB now
  */
 public class DispatchBuddyFirebaseInstanceIDService extends FirebaseInstanceIdService {
-    private DispatchBuddyBase DBB;
-
     @Override
     public void onTokenRefresh() {
         //registration token
-        DBB = DispatchBuddyBase.getInstance();
-        String registrationToken = DBB.getRegToken();
+        String registrationToken = getRegToken();
 
         Log.i("DBFIIDS", "storing updated registration token: "+registrationToken);
-        DBB.pushFirebaseClientRegistrationData(registrationToken);
+        DispatchBuddyBase.pushFirebaseClientRegistrationData(registrationToken);
     }
 }
