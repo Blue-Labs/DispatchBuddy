@@ -451,6 +451,7 @@ abstract class DispatchBuddyBase extends AppCompatActivity {
                             Glide.with(context)
                                     .using(new FirebaseImageLoader())
                                     .load(image)
+                                    .override(48,48)
 //                                    .diskCacheStrategy(DiskCacheStrategy.NONE) // turn these off after testing=good
 //                                    .skipMemoryCache(true)
                                     .into(view);

@@ -27,7 +27,8 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
     CustomItemClickListener listener;
 
     SortedList<ModelPersonnel> mData;
-    public AdapterDispatchResponders(ArrayList<String> emails, CustomItemClickListener itemClickListener) {
+    public AdapterDispatchResponders(ArrayList<String> list, CustomItemClickListener listener) {
+        this.listener = listener;
 
         mData = new SortedList<ModelPersonnel>(ModelPersonnel.class, new SortedListAdapterCallback<ModelPersonnel>(this) {
 
@@ -64,7 +65,7 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
             }
         });
 
-        for (String e : emails) {
+        for (String e : list) {
             Log.w(TAG, "email is:"+e);
             ModelPersonnel person = getPerson(e);
             if (person == null) {
@@ -74,7 +75,6 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
             }
             mData.add(person);
         }
-
     }
 
     @Override
