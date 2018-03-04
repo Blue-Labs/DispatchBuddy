@@ -14,18 +14,19 @@ import com.google.firebase.database.ValueEventListener;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.fireground.dispatchbuddy.DispatchBuddyBase.getTopPathRef;
+import static org.fireground.dispatchbuddy.DispatchBuddyBase.getUser;
+
 /**
  * Created by david on 2/13/18.
  */
 
 public class AdapterDispatchStatus {
     private static final String TAG = "DSA";
-    private DispatchBuddyBase DBB;
     private Context context;
 
     public AdapterDispatchStatus(Context context){
         this.context = context;
-        DBB = DispatchBuddyBase.getInstance();
     }
 
     private static Boolean isLongPressDispatchDialogShowing() {
@@ -55,8 +56,8 @@ public class AdapterDispatchStatus {
         final CheckedTextView mClearScene = (CheckedTextView) d.findViewById(R.id.clear_scene);
         final CheckedTextView mInQuarters = (CheckedTextView) d.findViewById(R.id.in_quarters);
 
-        final String person = DBB.getUser();
-        final DatabaseReference ref = DBB.getTopPathRef("/dispatch-status")
+        final String person = getUser();
+        final DatabaseReference ref = getTopPathRef("/dispatch-status")
                 .child(key)
                 .child("responding_personnel");
 
@@ -129,7 +130,7 @@ public class AdapterDispatchStatus {
             newStatus.put("on_scene", mOnScene.isChecked());
             newStatus.put("clear_scene", mClearScene.isChecked());
             newStatus.put("in_quarters", mInQuarters.isChecked());
-            DBB.getTopPathRef("/dispatch-status").child((String) dispatchKey.getText()).updateChildren(newStatus, new DatabaseReference.CompletionListener() {
+            getTopPathRef("/dispatch-status").child((String) dispatchKey.getText()).updateChildren(newStatus, new DatabaseReference.CompletionListener() {
                 @Override
                 public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
                     if (databaseError != null) {
@@ -142,7 +143,7 @@ public class AdapterDispatchStatus {
             model.setOn_scene(mOnScene.isChecked());
             model.setClear_scene(mClearScene.isChecked());
             model.setIn_quarters(mInQuarters.isChecked());
-            DBB.getTopPathRef("/dispatch-status").child(key).setValue(model);
+            getTopPathRef("/dispatch-status").child(key).setValue(model);
 //            DBB.getTopPathRef("/dispatch-status").child(key).updateChildren(model, new DatabaseReference.CompletionListener() {
 //                @Override
 //                public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
@@ -166,7 +167,7 @@ public class AdapterDispatchStatus {
             status = "en-route";
         }
 
-        DBB.getTopPathRef("/dispatches").child(key).child("event_status").setValue(status);
+        getTopPathRef("/dispatches").child(key).child("event_status").setValue(status);
     }
 
     public void updateDialogFromModel(String key) {
@@ -208,7 +209,7 @@ public class AdapterDispatchStatus {
                 if (model.getResponding_personnel() != null) {
                     for (RespondingPersonnel p : model.getResponding_personnel().values()) {
                         String pshit = p.getPerson();
-                        if (p.getPerson().equals(DBB.getUser())) {
+                        if (p.getPerson().equals(getUser())) {
                             found = true;
                             break;
                         }
