@@ -41,7 +41,7 @@ import javax.net.ssl.HttpsURLConnection;
 //        String url = "https://maps.google.com/maps/api/geocode/json?address="
 //                + Uri.encode(params[0])
 //                + "&sensor=true&key="
-//                + R.string.google_android_map_api_key;
+//                + R.string.google_android_web_referer_api_key;
 //        String response;
 //        try {
 //            response = getLatLongByURL(url);
