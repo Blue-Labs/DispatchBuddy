@@ -1,21 +1,25 @@
 package org.fireground.dispatchbuddy;
 
+import android.*;
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Dialog;
 import android.graphics.Color;
+import android.graphics.Point;
 import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
-import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.CheckedTextView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -35,6 +39,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.crash.FirebaseCrash;
 import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -49,6 +54,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 /**
  * Created by david on 2/11/18.
@@ -61,10 +67,9 @@ import java.util.Map;
  *
  */
 
-public class ActivityDispatches extends AppCompatActivity implements
+public class ActivityDispatches extends DispatchBuddyBase implements
         OnMapReadyCallback {
     final private String TAG = "DA";
-    private DispatchBuddyBase DBB;
 
     Query ordered_dispatches_query;
     Query dispatch_status_query;
@@ -82,7 +87,7 @@ public class ActivityDispatches extends AppCompatActivity implements
     public static Dialog dispatchOnClickDialog;
 
     private int eventCount = 0;
-    private int startupCount = 10;
+    private int startupCount = 50;
 
     protected LocationRequest locationRequest;
 
@@ -95,16 +100,15 @@ public class ActivityDispatches extends AppCompatActivity implements
         setSupportActionBar(toolbar);
 
         mNotificationUtils = new NotificationUtils(this);
-        DBB = DispatchBuddyBase.getInstance();
-        Log.i(TAG, "startup with DBB user: " + DBB.getUser());
+        Log.d(TAG, "startup with user: " + getUser());
         TextView mLoggedInUser = findViewById(R.id.loggedInUser);
-        mLoggedInUser.setText(DBB.getUser());
+        mLoggedInUser.setText(getUser());
 
         // subscribe to data-notifications
-        DBB.subscribeChannel("dispatches");
+        subscribeChannel("dispatches");
 
-        ordered_dispatches_query = DBB.getTopPathRef("/dispatches").orderByChild("isotimestamp").limitToLast(startupCount);
-        dispatch_status_query = DBB.getTopPathRef("/dispatch-status");
+        ordered_dispatches_query = getTopPathRef("/dispatches").orderByChild("isotimestamp").limitToLast(startupCount);
+        dispatch_status_query = getTopPathRef("/dispatch-status");
 
         emptyText = (TextView) findViewById(R.id.text_no_data);
 
@@ -147,18 +151,10 @@ public class ActivityDispatches extends AppCompatActivity implements
     }
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        Log.e(TAG, "inflating menu");
-        return super.onCreateOptionsMenu(menu);
-    }
-
-
-    @Override
     public void onResume() {
         super.onResume();
 
-        if (DBB.getUser() == null) {
+        if (getUser() == null) {
             ActivityDispatches.this.finish();
         }
     }
@@ -174,7 +170,6 @@ public class ActivityDispatches extends AppCompatActivity implements
                 ModelDispatch model = dataSnapshot.getValue(ModelDispatch.class);
                 if (model != null) {
                     model.setKey(dataSnapshot.getKey());
-                    Log.d(TAG, "adding dispatch: "+model.getKey());
                     dispatches.add(model);
                     adapter.notifyDataSetChanged();
                     checkIfEmpty();
@@ -259,7 +254,19 @@ public class ActivityDispatches extends AppCompatActivity implements
                 // actually, i think this will break as i don't think it will have
                 // the adapterPosition field..
                 // todo: let's test :-D
-                adapter.notifyItemRemoved(model.getAdapterPosition());
+                Log.d(TAG, "removing datasnapshot: "+dataSnapshot.toString());
+                if (model != null) {
+                    Log.d(TAG, "removing model: "+model.toString());
+
+                    Integer pos = model.getAdapterPosition();
+                    Log.d(TAG, "removing "+dataSnapshot.getKey()+" at position "+pos);
+                    if (pos != null) {
+                        adapter.notifyItemRemoved(pos);
+                    }
+                } else {
+                    Log.w(TAG, "model is null");
+                }
+
                 dispatches.remove(getDispatchItemIndex(model));
                 checkIfEmpty();
             }
@@ -282,7 +289,7 @@ public class ActivityDispatches extends AppCompatActivity implements
         ordered_dispatches_query.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                Log.d(TAG, "initial data load of dispatches completed");
+//                Log.d(TAG, "initial data load of dispatches completed");
 
                 dispatch_status_query.addChildEventListener(new ChildEventListener() {
                     @Override
@@ -354,7 +361,7 @@ public class ActivityDispatches extends AppCompatActivity implements
                                 if (d.getKey().equals(model.getKey())) {
                                     // update the responding personnel
                                     Integer di = d.getAdapterPosition();
-//                                    Log.e(TAG, "setting index ["+di+"] RSP count("+msize+") to "+rp + " for "+mkey);
+                                    FirebaseCrash.log("setting index ["+di+"] RSP count("+msize+") to "+rp + " for "+mkey);
                                     d.setRespondingPersonnel(model.getResponding_personnel());
                                     adapter.notifyItemChanged(di);
                                 }
@@ -456,8 +463,8 @@ public class ActivityDispatches extends AppCompatActivity implements
     }
 
     public void addGmapMarker(String inAddress, @Nullable final Map<String, Object> extra) {
-        final String address = DBB.prepareAddress(inAddress);
-        DatabaseReference ref = DBB.getTopPathRef("/geocodedAddresses");
+        final String address = prepareAddress(inAddress);
+        DatabaseReference ref = getTopPathRef("/geocodedAddresses");
 
         ref.orderByChild("address")
                 .equalTo(address)
@@ -468,7 +475,7 @@ public class ActivityDispatches extends AppCompatActivity implements
             public void onDataChange(DataSnapshot dataSnapshot) {
                 Log.d(TAG, address+" stored: "+dataSnapshot.exists());
                 if (!dataSnapshot.exists()) {
-                    DBB.getLatLng(
+                    getLatLng(
                            address,
                             new JsonObjectCallbackInterface() {
 
@@ -566,8 +573,7 @@ public class ActivityDispatches extends AppCompatActivity implements
             getGmapDirections(origin, destination);
         }
 
-
-        builder.include(marker_ll);
+        builder.include(marker.getPosition());
         bounds = builder.build();
 
         Log.i(TAG, "bounds are: "+bounds);
@@ -587,7 +593,7 @@ public class ActivityDispatches extends AppCompatActivity implements
 
     public void getGmapDirections(LatLng origin, LatLng destination) {
         Log.d(TAG, "fetching Gmap drive directions");
-        DBB.getGmapDirectionsJson(
+        getGmapDirectionsJson(
                 origin,
                 destination,
                 new JsonObjectCallbackInterface() {
@@ -622,6 +628,7 @@ public class ActivityDispatches extends AppCompatActivity implements
                                 LatLng position = new LatLng(lat, lng);
 
                                 points.add(position);
+                                builder.include(position);
                             }
 
                             // Adding all the points in the route to LineOptions
@@ -671,46 +678,58 @@ public class ActivityDispatches extends AppCompatActivity implements
         // IF THE USER selects [enroute] instead of [i'm responding to station], then
         // redraw from current location to the dispatch address instead
 
-        mFusedLocationClient = new FusedLocationProviderClient(ActivityDispatches.this);
+        if (!hasPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
+            Toast.makeText(this, "Location functions not available, Location permission was turned off", Toast.LENGTH_LONG).show();
+        } else {
+            mFusedLocationClient = new FusedLocationProviderClient(ActivityDispatches.this);
 //                mFusedLocationClient = LocationServices.getFusedLocationProviderClient();
 
-        mFusedLocationClient.getLastLocation()
-                .addOnSuccessListener(ActivityDispatches.this, new OnSuccessListener<Location>() {
-                    @Override
-                    public void onSuccess(Location location) {
-                        // Got last known location. In some rare situations this can be null.
-                        if (location != null) {
-                            Log.e(TAG, "new location is:"+location);
-                        } else {
-                            Log.e(TAG, "nope, still no location");
+            mFusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(ActivityDispatches.this, new OnSuccessListener<Location>() {
+                        @Override
+                        public void onSuccess(Location location) {
+                            // Got last known location. In some rare situations this can be null.
+                            if (location != null) {
+                                Log.e(TAG, "new location is:"+location);
+                            } else {
+                                Log.e(TAG, "nope, still no location");
+                            }
                         }
-                    }
-                })
-                .addOnFailureListener(this, new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.e(TAG, "failed to get location data: "
-                            +e.getLocalizedMessage());
-                    }
-                });
-
+                    })
+                    .addOnFailureListener(this, new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            Log.e(TAG, "failed to get location data: "
+                                    +e.getLocalizedMessage());
+                        }
+                    });
+        }
 
         gmap = googleMap;
-        gmap.setMinZoomPreference(7);
+        gmap.setMinZoomPreference(5);
 //      gmap.moveCamera(CameraUpdateFactory.newLatLng(smvfd_station));
         gmap.getUiSettings().setCompassEnabled(true);
         gmap.getUiSettings().setZoomControlsEnabled(true);
 
+//                            gmap.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, 0));
+//
+//                            Point mappoint = gmap.getProjection().toScreenLocation(bounds.getCenter());
+//                            gmap.moveCamera(CameraUpdateFactory.newLatLng(gmap.getProjection().fromScreenLocation(mappoint)));
+
         if (bounds != null) {
+            // todo: need a map listener to do camera updates when markers and routes are added
+            gmap.moveCamera(CameraUpdateFactory.newLatLngZoom(bounds.getCenter(), 20));
+
             CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, 100);
             gmap.moveCamera(cu);
         }
 //                gmap.animateCamera(CameraUpdateFactory.zoomTo(14), 500, null);
+                  // todo: wrap this in location permission
 //                gmap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
 //                    @Override
 //                    public void onMyLocationChange(Location arg0) {
 //                        // TODO Auto-generated method stub
-//                        gmap.addMarker(new MarkerOptions().position(new LatLng(arg0.getLatitude(), arg0.getLongitude())).title("It's Me!"));
+//                        gmap.addMarker(new MarkerOptions().position(new LatLng(arg0.getLatitude(), arg0.getLongitude())).title("Me"));
 //                    }
 //                });
     }
@@ -741,6 +760,7 @@ public class ActivityDispatches extends AppCompatActivity implements
         dispatchOnClickDialog.show();
         dispatchOnClickDialog.setCanceledOnTouchOutside(true);
         dispatchOnClickDialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+
 
         LinearLayoutManager llm = new LinearLayoutManager(this);
         llm.setOrientation(LinearLayoutManager.VERTICAL);
@@ -775,30 +795,46 @@ public class ActivityDispatches extends AppCompatActivity implements
         rv.setAdapter(respondersAdapter);
     }
 
+    // todo: some phones show this dialog with very dimmed for the map, the "fix" will take a lot
+    // of work, basically making a new activity with a transparent background to emulate a dialog
+    // https://github.com/mapbox/mapbox-gl-native/issues/6101
     public void dispatchesLongpressDialog(final ModelDispatch dispatch) {
         dispatchLongpressDialog = new Dialog(this);
         dispatchLongpressDialog.setContentView(R.layout.dispatch_longpress_dialog);
         dispatchLongpressDialog.setTitle("Event activity");
         dispatchLongpressDialog.show();
 
-        markerList.clear();
-        createGmap(dispatchLongpressDialog);
-
-        // hardwire for testing
-
-        Map<String, Object> extra = new HashMap<>();
-        extra.put("type", "incident location");
-
-        // todo: we need the zip code, this can probably go in a Firebase Config object
-        String city = dispatch.getOwning_city();
-
-        if (city == null) { city = dispatch.getCity(); }
-        if (city == null) { city = "Meriden CT 06451"; }
-        if (!city.endsWith(" [\\d-]{5,10}")) {
-            city += " 06451";
+        // some phones have a really broken mapview implementation that puts the map _below_ the dimmed surfaceview
+        if (android.os.Build.VERSION.RELEASE.startsWith("6.0")) {
+            Log.w(TAG, "Broken MapView Surface artifacts, undoing DIM");
+            dispatchLongpressDialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         }
 
-        addGmapMarker(dispatch.getAddress()+", "+city, extra);
+        FirebaseCrash.logcat(Log.INFO, TAG, "dialog created");
+
+        markerList.clear();
+
+        if (!isGoogleApiServicesGood(this)) {
+            Toast.makeText(this, "Google API services not available", Toast.LENGTH_SHORT).show();
+        } else {
+            createGmap(dispatchLongpressDialog);
+
+            // hardwire for testing
+
+            Map<String, Object> extra = new HashMap<>();
+            extra.put("type", "incident location");
+
+            // todo: we need the zip code, this can probably go in a Firebase Config object
+            String city = dispatch.getOwning_city();
+
+            if (city == null) { city = dispatch.getCity(); }
+            if (city == null) { city = "Meriden CT 06451"; }
+            if (!city.endsWith(" [\\d-]{5,10}")) {
+                city += " 06451";
+            }
+
+            addGmapMarker(dispatch.getAddress()+", "+city, extra);
+        }
 
         // do onClick events
         final TextView dispatchKey = (TextView) dispatchLongpressDialog.findViewById(R.id.dispatchKey);
@@ -882,7 +918,5 @@ public class ActivityDispatches extends AppCompatActivity implements
                 //dispatchLongpressDialog.hide();
             }
         });
-
     }
-
 }
