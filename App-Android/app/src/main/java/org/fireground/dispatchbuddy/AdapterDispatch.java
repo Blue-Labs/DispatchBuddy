@@ -182,6 +182,8 @@ public class AdapterDispatch extends RecyclerView.Adapter<AdapterDispatch.ViewHo
             holder.scenario_type.setImageResource(R.mipmap.ic_water_emergency_foreground);
         } else if (dispatch.nature.contentEquals("FIRE- BOX TRK/TRAC TRLR/TRAIN")) {
             holder.scenario_type.setImageResource(R.mipmap.ic_fire_rescue_foreground);
+        } else if (dispatch.nature.contentEquals("MV ACCIDENT INVOLVING BUILDING")) {
+            holder.scenario_type.setImageResource(R.mipmap.ic_mv_vs_building_foreground);
         } else {
             //Log.w(TAG, "unknown image type, nature is: " + dispatch.getNature());
             holder.scenario_type.setImageResource(android.R.color.transparent);

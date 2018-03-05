@@ -24,7 +24,7 @@
             android:layout_margin="0dp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            android:src="@mipmap/ic_dispatchbuddy"
+            android:src="@mipmap/ic_dispatchbuddy_foreground"
             />
 
         <TextView
