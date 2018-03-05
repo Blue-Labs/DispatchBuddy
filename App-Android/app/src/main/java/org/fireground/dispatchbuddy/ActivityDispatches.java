@@ -368,7 +368,11 @@ public class ActivityDispatches extends DispatchBuddyBase implements
                                     // update the responding personnel
                                     Integer di = d.getAdapterPosition();
                                     FirebaseCrash.log("setting index ["+di+"] RSP count("+msize+") to "+rp + " for "+mkey);
-                                    d.setRespondingPersonnel(model.getResponding_personnel());
+                                    try {
+                                        d.setRespondingPersonnel(model.getResponding_personnel());
+                                    } catch (NullPointerException e) {
+                                        //
+                                    }
                                     adapter.notifyItemChanged(di);
                                 }
                             }
@@ -788,7 +792,7 @@ public class ActivityDispatches extends DispatchBuddyBase implements
         }
 
         respondersAdapter = new AdapterDispatchResponders(
-                (ArrayList<String>) list,
+                (ArrayList<String>) list/*,
                 new CustomItemClickListener() {
             @Override
             public void onItemClick(View v, int position) {
@@ -800,7 +804,7 @@ public class ActivityDispatches extends DispatchBuddyBase implements
 //                dispatchesLongpressDialog(dispatches.get(position));
                 return true;
             }
-        });
+        }*/);
 
         rv.setAdapter(respondersAdapter);
     }
