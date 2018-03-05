@@ -147,6 +147,7 @@ abstract class DispatchBuddyBase extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.appLogout:
+                unSubscribeChannel("dispatches");
                 logOut();
                 TextView mLoggedInUser = findViewById(R.id.loggedInUser);
                 mLoggedInUser.setText("");
@@ -325,11 +326,15 @@ abstract class DispatchBuddyBase extends AppCompatActivity {
     private int getPersonnelIndex(String key) {
         int index = -1;
 
-        for (int i = 0; i < personnel.size(); i++) {
-            if (personnel.get(i).getKey().equals(key)) {
-                index = i;
-                break;
+        try {
+            for (int i = 0; i < personnel.size(); i++) {
+                if (personnel.get(i).getKey().equals(key)) {
+                    index = i;
+                    break;
+                }
             }
+        } catch (NullPointerException e) {
+            // incomplete record exists, just ignore it, it's being typed in by hand and eventually the full record will arrive
         }
 
         return index;
@@ -389,6 +394,14 @@ abstract class DispatchBuddyBase extends AppCompatActivity {
         FirebaseMessaging.getInstance().subscribeToTopic(channel);
     }
 
+    public void unSubscribeChannel(String channel) {
+        // channels will use the same buildable form for channel names
+        channel = buildChannelName(channel);
+
+        Log.d(TAG, "unsubscribing from channel: "+channel);
+        FirebaseMessaging.getInstance().unsubscribeFromTopic(channel);
+    }
+
     public static DatabaseReference getTopPathRef(String path) {
         path = buildPathPrefix(path);
 //        Log.d(TAG, "obtaining ref for: "+path);
@@ -432,8 +445,12 @@ abstract class DispatchBuddyBase extends AppCompatActivity {
                                 DataSnapshot ds1 = dataSnapshot.getChildren().iterator().next();
                                 String key = ds1.getKey();
 
-                                String imageUrl = (String) dataSnapshot.child(key).child("profileIcon").getValue();
-                                filename = imageUrl.substring(imageUrl.lastIndexOf('/')+1);
+                                try {
+                                    String imageUrl = (String) dataSnapshot.child(key).child("profileIcon").getValue();
+                                    filename = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+                                } catch (NullPointerException e) {
+                                    filename = "fire_axes_and_shield_64x64.png";
+                                }
                             }
                         }
 
