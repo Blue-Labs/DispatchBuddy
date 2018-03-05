@@ -50,6 +50,7 @@ import java.util.Map;
  * TODO: cache drive route directions for ~10 minutes
  * TODO: redo the onClick for dispatches so users can tap on the personnel icon for personnel list, and get detailed incident data if tapping elsewhere
  * TODO: the name set in NotificationCategory is a bit wrong, needs to get fixed
+ * TODO: unsubscribe from firebase messaging channels on logout
  *
  *
  * notes:
@@ -58,6 +59,9 @@ import java.util.Map;
  * resolved, alphas will NOT show up at the published URL, they show up only to a
  * specific testing url, which is only found AFTER you publish and IF you have a
  * list of testers defined.
+ *
+ * swipe/fling: https://stackoverflow.com/questions/32966069/how-implement-left-right-swipe-fling-on-layout-in-android
+ * tab views w/ swipe: https://www.youtube.com/watch?v=zcnT-3F-9JA
  *
  */
 
