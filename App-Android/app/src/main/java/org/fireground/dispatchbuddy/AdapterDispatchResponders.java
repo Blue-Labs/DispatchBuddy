@@ -27,8 +27,8 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
     CustomItemClickListener listener;
 
     SortedList<ModelPersonnel> mData;
-    public AdapterDispatchResponders(ArrayList<String> list, CustomItemClickListener listener) {
-        this.listener = listener;
+    public AdapterDispatchResponders(ArrayList<String> list/*, CustomItemClickListener listener*/) {
+//        this.listener = listener;
 
         mData = new SortedList<ModelPersonnel>(ModelPersonnel.class, new SortedListAdapterCallback<ModelPersonnel>(this) {
 
@@ -101,6 +101,7 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
         FirebaseCrash.log("mViewHolder is: "+mViewHolder.toString());
         FirebaseCrash.log("parent is: "+parent.toString());
 
+        /*
         view.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -116,6 +117,7 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
                 return listener.onItemLongClick(v, lp);
             }
         });
+        */
 
         Log.i(TAG, "dispatch responders onCreateViewHolder created");
         return mViewHolder;
@@ -139,6 +141,13 @@ public class AdapterDispatchResponders extends RecyclerView.Adapter<AdapterDispa
             personnelEmail = (TextView) itemView.findViewById(R.id.personnelEmail);
             locator = (ImageView) itemView.findViewById(R.id.locatePerson);
             Log.i("VHDR", "ViewHolder for DispatchResponders created");
+
+            locator.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Log.i("vhdr", "onClick for "+personnelEmail.getText());
+                }
+            });
         }
 
     }
