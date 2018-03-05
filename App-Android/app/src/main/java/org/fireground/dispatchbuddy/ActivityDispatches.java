@@ -51,7 +51,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.reflect.Array;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +75,7 @@ import java.util.stream.IntStream;
 public class ActivityDispatches extends DispatchBuddyBase implements
         OnMapReadyCallback {
     final private String TAG = "DA";
+    final private SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
     Query ordered_dispatches_query;
     Query dispatch_status_query;
@@ -174,7 +179,10 @@ public class ActivityDispatches extends DispatchBuddyBase implements
                     dispatches.add(model);
                     adapter.mData.add(model);
                     Log.i(TAG, "added dispatch model for "+dataSnapshot.getKey());
-//                    adapter.notifyDataSetChanged();
+
+                    // todo: notify for specific item
+                    adapter.notifyDataSetChanged();
+
                     checkIfEmpty();
 
                     // TODO this mini builder should become its own method
@@ -192,6 +200,8 @@ public class ActivityDispatches extends DispatchBuddyBase implements
                                 priority = NotificationCompat.PRIORITY_DEFAULT;
                         }
 
+                        // todo: this shouldn't be necessary any more since we're pushing a Firebase notification
+                        /*
                         String message = model.nature;
                         String status = model.event_status;
                         if (status != null) {
@@ -200,7 +210,7 @@ public class ActivityDispatches extends DispatchBuddyBase implements
                         } else {
                             // create a parent notification as the group summary
                             mNotificationUtils.sendNotification(message, model.address, priority, model.isotimestamp, true);
-                        }
+                        }*/
                     } else {
                         eventCount++;
                     }
@@ -223,9 +233,14 @@ public class ActivityDispatches extends DispatchBuddyBase implements
                 model.setAdapterPosition(old.getAdapterPosition());
                 model.setRespondingPersonnel(old.getRespondingPersonnel());
 
+                Integer p;
+                p = model.getAdapterPosition();
+                Log.i(TAG, "model position1: "+p);
                 dispatches.set(getDispatchItemIndex(model), model);
                 adapter.mData.updateItemAt(getDispatchItemIndex(model), model);
-//                adapter.notifyItemChanged(model.getAdapterPosition());
+                p = model.getAdapterPosition();
+                Log.i(TAG, "model position2: "+p);
+                adapter.notifyItemChanged(p);
 
                 Integer priority = 0;
                 String msgType = model.getMsgtype();
@@ -240,14 +255,31 @@ public class ActivityDispatches extends DispatchBuddyBase implements
                         priority = NotificationCompat.PRIORITY_DEFAULT;
                 }
 
-                String message = model.nature;
-                String status = model.event_status;
-                if (status != null) {
-                    message += "\n[" + status + "]";
-                    mNotificationUtils.sendNotification(message, model.address, priority, model.isotimestamp, false);
-                } else {
-                    // create a parent notification as the group summary
-                    mNotificationUtils.sendNotification(message, model.address, priority, model.isotimestamp, true);
+                Boolean sendIt=true;
+                try {
+                    // todo: if timestamp on this event is more than 24hrs, don't make a notification
+                    Date d = sdf.parse(model.isotimestamp.toString());
+                    Calendar c = Calendar.getInstance();
+                    c.add(Calendar.DAY_OF_MONTH, -1);
+                    if (c.getTimeInMillis() > d.getTime()) {
+                        sendIt = false;
+                        Log.d(TAG, "don't send a notification");
+                    } else {
+                        Log.d(TAG, "send an update notification, priority "+priority);
+                    }
+                } catch (ParseException e) {
+                }
+
+                if (sendIt) {
+                    String message = model.nature;
+                    String status = model.event_status;
+                    if (status != null) {
+                        message += "\n[" + status + "]";
+                        mNotificationUtils.sendNotification(message, model.address, priority, model.isotimestamp, false);
+                    } else {
+                        // create a parent notification as the group summary
+                        mNotificationUtils.sendNotification(message, model.address, priority, model.isotimestamp, true);
+                    }
                 }
             }
 
@@ -274,6 +306,9 @@ public class ActivityDispatches extends DispatchBuddyBase implements
                 dispatches.remove(getDispatchItemIndex(model));
                 checkIfEmpty();
                 adapter.mData.remove(model);
+
+                // todo: notify for specific item
+                adapter.notifyDataSetChanged();
             }
 
             @Override
