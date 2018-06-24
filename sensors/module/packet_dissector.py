@@ -519,42 +519,42 @@ class Packet(object):
 
     def items(self, highlight=[]):
         P = self.P
-        outdick = {'src':self.machex(P.ethernet.src), 'dst':self.machex(P.ethernet.dst),
+        outdict = {'src':self.machex(P.ethernet.src), 'dst':self.machex(P.ethernet.dst),
                            'type':'{:#06x}'.format(P.ethernet.type)}
 
-        for e in outdick:
+        for e in outdict:
             if 'Ethernet.'+e in highlight:
-                outdick[e] = '\\x1b[1;31m'+str(outdick[e])+ '\\x1b[0m'
+                outdict[e] = '\\x1b[1;31m'+str(outdict[e])+ '\\x1b[0m'
 
-        yield 'Ethernet', outdick
+        yield 'Ethernet', outdict
 
-        outdick = {'version':P.ip.version, 'header_length':P.ip.header_length, 'DS':P.ip.ds,
+        outdict = {'version':P.ip.version, 'header_length':P.ip.header_length, 'DS':P.ip.ds,
                      'total_length':P.ip.total_length, 'id':P.ip.id, 'flags':P.ip.flags,
                      'ttl':P.ip.ttl, 'fragment_offset':P.ip.fragment_offset, 'protocol':P.ip.protocol,
                      'checksum':P.ip.checksum, 'src':P.ip.src, 'dst':P.ip.dst}
 
-        for e in outdick:
+        for e in outdict:
             if 'IP.'+e in highlight:
-                outdick[e] = '\x1b[1;31m'+str(outdick[e])+'\x1b[0m'
+                outdict[e] = '\x1b[1;31m'+str(outdict[e])+'\x1b[0m'
 
-        yield ' IP', outdick
+        yield ' IP', outdict
 
         if P.ip.protocol == 'udp':
-            outdick = {'sport':P.udp.sport, 'dport':P.udp.dport, 'length':P.udp.length, 'checksum':P.udp.checksum}
-            for e in outdick:
+            outdict = {'sport':P.udp.sport, 'dport':P.udp.dport, 'length':P.udp.length, 'checksum':P.udp.checksum}
+            for e in outdict:
                 if 'UDP.'+e in highlight:
-                    outdick[e] = '\x1b[1;31m'+str(outdick[e])+'\x1b[0m'
-            yield '  UDP', outdick
+                    outdict[e] = '\x1b[1;31m'+str(outdict[e])+'\x1b[0m'
+            yield '  UDP', outdict
 
         elif P.ip.protocol == 'tcp':
-            outdick = {'sport':P.tcp.sport, 'dport':P.tcp.dport, 'SEQ#':P.tcp.sequence_number,
+            outdict = {'sport':P.tcp.sport, 'dport':P.tcp.dport, 'SEQ#':P.tcp.sequence_number,
                           'ACK#':P.tcp.acknowledgement_number, 'HLen':P.tcp.header_length, 'Flags':P.tcp.flags,
                           'WSize':P.tcp.window_size, 'checksum':P.tcp.checksum, 'Urgent':P.tcp.urgent_pointer,
                           'Options':P.tcp.options}
-            for e in outdick:
+            for e in outdict:
                 if 'TCP.'+e in highlight:
-                    outdick[e] = '\x1b[1;31m'+str(outdick[e])+'\x1b[0m'
-            yield '  TCP', outdick
+                    outdict[e] = '\x1b[1;31m'+str(outdict[e])+'\x1b[0m'
+            yield '  TCP', outdict
 
         yield '   Payload', P.payload
 
