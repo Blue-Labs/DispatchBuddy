@@ -175,7 +175,9 @@ class EventManager:
                 if not len(self.eventgroups[evgtype]):
                     continue
 
-                for evid in self.eventgroups[evgtype].events:
+                # make a copy of the dict keys so we're not bothered if
+                # the dictionary size changes
+                for evid in list(self.eventgroups[evgtype].events.keys()):
                     event = self.eventgroups[evgtype].events[evid]
                     self.logger.debug('checking {}'.format(event.uuid))
 
